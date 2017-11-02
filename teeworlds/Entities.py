@@ -51,8 +51,8 @@ class Player(Alive):
         self.image = pygame.image.load("img/gg.png")
         self.rope = Rope(self)
 
-    def moveAfterMouse(self, m_pos):
-        self.angle = utils.angleTo(self.rect.center, m_pos)
+    def moveAfterMouse(self, mouse_pos):
+        self.angle = utils.angleTo(self.rect.center, mouse_pos)
         self.xvel, self.yvel = utils.toRectCoords(10, self.angle)
 
     def lookOnMouse(self, m_pos):
@@ -67,8 +67,11 @@ class Rope(Objects.GameObject):
         super().__init__(list(owner.rect.center) + self.size, collideable=False)
         self.image = pygame.image.load("img/rope.png")
         
+    def pushToSpriteGroup(self):
+        super().pushToSpriteGroup(priority=0)
+        
     def update(self):
-        super().update(coords=self.owner.rect.center)
+        self.rect.center = self.owner.rect.center
         
     def shoot(self):
         pass

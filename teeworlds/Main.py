@@ -1,5 +1,6 @@
 import pygame
 import re
+import time
 from Entities import Player
 import Objects
 
@@ -53,7 +54,7 @@ mainloop = True
 
 window = pygame.display.set_mode(SCR_SIZE)
 screen = pygame.Surface(SCR_SIZE)
-    
+
 
 def eventsHandler():
     global mainloop
@@ -61,11 +62,11 @@ def eventsHandler():
     if e.type == pygame.QUIT:
         mainloop = False
     elif e.type == pygame.KEYDOWN:
-        if e.key == pygame.K_LEFT:
+        if e.key == pygame.K_LEFT or e.key == pygame.K_a:
             hero.keydir[0] = -1
-        elif e.key == pygame.K_RIGHT:
+        elif e.key == pygame.K_RIGHT or e.key == pygame.K_d:
             hero.keydir[0] = 1
-        elif e.key == pygame.K_UP:
+        elif e.key == pygame.K_UP or e.key == pygame.K_w:
             hero.keydir[1] = -1
         elif e.key == pygame.K_ESCAPE:
             mainloop = False
@@ -74,17 +75,17 @@ def eventsHandler():
             hero.yvel = 0
 
     elif e.type == pygame.KEYUP:
-        if e.key == pygame.K_LEFT:
+        if e.key == pygame.K_LEFT or e.key == pygame.K_a:
             hero.keydir[0] = 0
-        elif e.key == pygame.K_RIGHT:
+        elif e.key == pygame.K_RIGHT or e.key == pygame.K_d:
             hero.keydir[0] = 0
-        elif e.key == pygame.K_UP:
+        elif e.key == pygame.K_UP or e.key == pygame.K_w:
             hero.keydir[1] = 0
             
-    elif e.type == pygame.MOUSEBUTTONDOWN:
-        hero.moveAfterMouse(e.pos)
-    elif e.type == pygame.MOUSEMOTION:
-        hero.lookOnMouse(e.pos)
+    mouse_pos = pygame.mouse.get_pos()
+    if pygame.mouse.get_pressed()[0]:
+        hero.moveAfterMouse(mouse_pos)
+    hero.lookOnMouse(mouse_pos)
 
 while mainloop:
     pygame.display.set_caption('dir: %s, xy: %s, vel: %s, %s' % (hero.dir, [hero.rect.x, hero.rect.y], [hero.xvel, round(hero.yvel, 2)], hero.onGround))

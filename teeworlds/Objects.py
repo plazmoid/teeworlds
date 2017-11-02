@@ -4,15 +4,11 @@ import pygame
 
 PLATFORM_SIZE = 30
 
-class UpdSpriteGroup(pygame.sprite.Group):
-    
-    def update(self):
-        for itm in self:
-            if type(itm) != Block:
-                itm.update()
+class UpdSpriteGroup(pygame.sprite.OrderedUpdates):
 
     def draw_n_update(self, surface):
-        self.update()
+        for obj in self:
+            obj.update()
         super().draw(surface)
 
 ALL_OBJECTS = UpdSpriteGroup()
@@ -26,10 +22,8 @@ class GameObject(Sprite):
         self.rect = pygame.Rect(*sizes)
         ALL_OBJECTS.add(self)
 
-    def update(self, coords=None):
-        if not coords:
-            return
-        self.rect.center = coords
+    def update(self):
+        raise NotImplementedError
 
     def __repr__(self):
         return '%s(%s)' % (self.__class__, self.sizes[:2])
@@ -68,6 +62,8 @@ class Block(GameObject):
             return (False, 0, entity.yvel+0.1 if entity.yvel < 0 else entity.yvel)
         raise RuntimeError('Bad collision')
 
+    def update(self):
+        pass
 
 class JumperBlock(Block):
     
