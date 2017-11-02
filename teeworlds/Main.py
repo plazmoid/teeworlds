@@ -81,7 +81,7 @@ def eventsHandler():
             hero.keydir[0] = 0
         elif e.key == pygame.K_UP or e.key == pygame.K_w:
             hero.keydir[1] = 0
-            
+
     mouse_pos = pygame.mouse.get_pos()
     if pygame.mouse.get_pressed()[0]:
         hero.moveAfterMouse(mouse_pos)
