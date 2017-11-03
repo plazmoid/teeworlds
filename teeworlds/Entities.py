@@ -67,9 +67,6 @@ class Rope(Objects.GameObject):
         super().__init__(list(owner.rect.center) + self.size, collideable=False)
         self.image = pygame.image.load("img/rope.png")
         
-    def pushToSpriteGroup(self):
-        super().pushToSpriteGroup(priority=0)
-        
     def update(self):
         self.rect.center = self.owner.rect.center
         

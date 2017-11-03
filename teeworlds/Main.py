@@ -1,6 +1,5 @@
 import pygame
 import re
-import time
 from Entities import Player
 import Objects
 
@@ -45,6 +44,7 @@ class LevelBuilder:
                 bpoint = [bx*PF_SIZE, by*PF_SIZE]
                 self.blocks[block](bpoint)
             by += 1
+
 
 
 level = LevelBuilder()
