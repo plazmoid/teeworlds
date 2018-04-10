@@ -59,7 +59,7 @@ class Player(Alive):
         self.dir = -1 if self.rect.centerx > m_pos[0] else 1
 
 
-class Rope(Objects.GameObject):
+class Rope(Objects.GameObject): #запилить Item
     
     def __init__(self, owner):
         self.size = [40, 20]

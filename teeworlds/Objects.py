@@ -1,17 +1,15 @@
 from pygame.sprite import Sprite as Sprite
-import utils
 import pygame
+import utils
 
 PLATFORM_SIZE = 30
+ALL_OBJECTS = pygame.sprite.OrderedUpdates()
 
-class UpdSpriteGroup(pygame.sprite.OrderedUpdates):
+def update_all(surface):
+    for obj in ALL_OBJECTS:
+        obj.update()
+    ALL_OBJECTS.draw(surface)
 
-    def draw_n_update(self, surface):
-        for obj in self:
-            obj.update()
-        super().draw(surface)
-
-ALL_OBJECTS = UpdSpriteGroup()
 
 class GameObject(Sprite):
 
@@ -25,12 +23,12 @@ class GameObject(Sprite):
     def update(self):
         raise NotImplementedError
 
-    def __repr__(self):
+    def __str__(self):
         return '%s(%s)' % (self.__class__, self.sizes[:2])
 
 
 class Block(GameObject):
-    
+
     axis_rot = 45
     rot_coef = -3
     rot_offset_vert = axis_rot + rot_coef

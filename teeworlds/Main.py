@@ -46,7 +46,6 @@ class LevelBuilder:
             by += 1
 
 
-
 level = LevelBuilder()
 level.build(1)
 hero = Player([100,200])
@@ -91,7 +90,7 @@ while mainloop:
     pygame.display.set_caption('dir: %s, xy: %s, vel: %s, %s' % (hero.dir, [hero.rect.x, hero.rect.y], [hero.xvel, round(hero.yvel, 2)], hero.onGround))
     eventsHandler()
     screen.fill(pygame.Color('white'))
-    Objects.ALL_OBJECTS.draw_n_update(screen)
+    Objects.update_all(screen)
     window.blit(screen, (0,0))
     pygame.display.flip()
-    pygame.time.wait(10)
+    pygame.time.wait(12)
