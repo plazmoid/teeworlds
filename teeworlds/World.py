@@ -1,4 +1,3 @@
-import pygame
 import re
 from Entities import Player
 import Objects

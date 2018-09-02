@@ -6,7 +6,7 @@ import pygame
 from API import TW_API, TWRequest
 from time import sleep
 
-SERVER_ADDR = ('90.157.107.41', 31337)
+SERVER_ADDR = ('0.0.0.0', 31337)
 ENTITIES = {}
 
 class TWClient(TWRequest):    
@@ -14,7 +14,7 @@ class TWClient(TWRequest):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         TWRequest.__init__(self, self.sock)
         print('Establishing connection...')
-        while not len(self.session):
+        while not self.session:
             try:
                 self.sock.connect(SERVER_ADDR)
                 self._request(TW_API.INIT)
@@ -24,7 +24,7 @@ class TWClient(TWRequest):
                 sleep(1)
                 continue
         print('Wow, such conexion')
-        #threading.Thread(target=self.updater).start()
+        threading.Thread(target=self.updater).start()
         ENTITIES.update({self.session: World.create_player()})
         self.mainloop()
         
@@ -33,22 +33,24 @@ class TWClient(TWRequest):
         
     def updater(self):
         while True:
-            self._request(TW_API.UPDATE)
-            for k,v in self._receive()['updated']:
+            self._request(TW_API.UPDATE, updated='')
+            for k,v in self._receive()['updated'].items():
+                c = v.split('|')
                 if k not in ENTITIES:
-                    ENTITIES[k] = World.create_player([v.x, v.y])
+                    ENTITIES[k] = World.create_player([int(c[0]), int(c[1])])
                 else:
-                    ENTITIES[k].rect = v
+                    ENTITIES[k].rect.x = int(c[0])
+                    ENTITIES[k].rect.y = int(c[1])
             sleep(0.15)
             
     def events_handler(self):
         e = pygame.event.poll()
         if e.type == pygame.QUIT:
-            del self
+            self.loop = False
         elif e.type == pygame.KEYDOWN:
             if e.key == pygame.K_ESCAPE:
-                del self
-        if e:
+                self.loop = False
+        if e.type == pygame.KEYDOWN or e.type == pygame.KEYUP:
             self.send_keys(e.key, e.type)
             
     def mainloop(self):
@@ -56,10 +58,10 @@ class TWClient(TWRequest):
         level.build(1)
         window = pygame.display.set_mode(World.SCR_SIZE)
         screen = pygame.Surface(World.SCR_SIZE)
-        while True:
+        self.loop = True
+        while self.loop:
             #pygame.display.set_caption('dir: %s, xy: %s, vel: %s, %s' % (hero.dir, [hero.rect.x, hero.rect.y], [hero.xvel, round(hero.yvel, 2)], hero.onGround))
             self.events_handler()
-            self.updater()
             screen.fill(pygame.Color('white'))
             Objects.OBJECTS_POOL.update()
             Objects.OBJECTS_POOL.draw(screen)
@@ -69,3 +71,6 @@ class TWClient(TWRequest):
     
     def __del__(self):
         self.sock.close()
+
+
+TWClient()

@@ -10,13 +10,13 @@ CLIENTS = {}
 
 class TWServerHandler(BaseRequestHandler, TWRequest):
 
-    def __init__(self, *args):
-        BaseRequestHandler.__init__(self, *args)
-        TWRequest.__init__(self, self.request)
+#     def __init__(self, *args):
+#         BaseRequestHandler.__init__(self, *args)
 
     def handle(self):
+        TWRequest.__init__(self, self.request)
         while True:
-            data, self.req_addr = self._receive()
+            data = self._receive()
             if data['method'] == 'INIT':
                 self.new_player()
             elif data['method'] == 'UPDATE':
@@ -26,16 +26,15 @@ class TWServerHandler(BaseRequestHandler, TWRequest):
 
     def new_player(self):
         random.seed()
-        while True:
-            session = random.randint(1, 255)
-            if session not in CLIENTS:
+        while not self.session:
+            self.session = random.randint(1, 255)
+            if self.session not in CLIENTS:
                 break
-        CLIENTS.update({session: World.create_player()})
-        self.session = session
+        CLIENTS.update({self.session: World.create_player()})
         self._request(TW_API.INIT)
         
     def updater(self):
-        self._request(TW_API.UPDATE, updated=map(lambda k,v: (k, v.rect), CLIENTS))
+        self._request(TW_API.UPDATE, updated={int(k): v.getXY() for k, v in CLIENTS.items()})
 
     def keys_handler(self, key, ktype):
         if key == pygame.K_LEFT or key == pygame.K_a:

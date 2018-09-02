@@ -38,9 +38,10 @@ class TWRequest:
         self.session = session if session else ''
 
     def _request(self, method, **kwargs):
-        self.sock.send(json.dumps(method(session=self.session, **kwargs)))
+        data = method(session=self.session, **kwargs)
+        self.sock.send(json.dumps(data).encode('utf-8'))
 
     def _receive(self):
-        data, addr = self.sock.recv(1024)
-        return (json.loads(data), addr)
+        data = self.sock.recv(1024).decode('utf-8')
+        return json.loads(data)
         

@@ -20,6 +20,9 @@ class GameObject(Sprite):
 
     def __str__(self):
         return '%s(%s)' % (self.__class__, self.sizes[:2])
+    
+    def getXY(self):
+        return '%d|%d' % (self.rect.x, self.rect.y)
 
 
 class Block(GameObject):
