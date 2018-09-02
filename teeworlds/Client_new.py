@@ -1,7 +1,7 @@
 import socket as s
 import socketserver
 import threading
-import msvcrt
+import getch
 
 class TWClientHandler(socketserver.BaseRequestHandler):
     
@@ -41,5 +41,5 @@ with s.socket(s.AF_INET, s.SOCK_STREAM, s.IPPROTO_TCP) as sock:
     client_thread = threading.Thread(target=client.serve_forever)
     client_thread.start()
     while True:
-        if msvcrt.kbhit():
-            sock.send(msvcrt.getch()) 
+        sock.send(bytes(getch.getch(), encoding='utf-8')) 
+            

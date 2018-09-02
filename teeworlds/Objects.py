@@ -1,24 +1,19 @@
-from pygame.sprite import Sprite as Sprite
+from pygame.sprite import Sprite
 import pygame
-import utils
 
 PLATFORM_SIZE = 30
-ALL_OBJECTS = pygame.sprite.OrderedUpdates()
-
-def update_all(surface):
-    for obj in ALL_OBJECTS:
-        obj.update()
-    ALL_OBJECTS.draw(surface)
+OBJECTS_POOL = pygame.sprite.OrderedUpdates()
 
 
 class GameObject(Sprite):
 
-    def __init__(self, sizes, collideable=True):
+    def __init__(self, sizes):
         super().__init__()
         self.sizes = sizes
-        self.collideable = collideable
+        self.collideable = True
+        self.updateable = True
         self.rect = pygame.Rect(*sizes)
-        ALL_OBJECTS.add(self)
+        OBJECTS_POOL.add(self)
 
     def update(self):
         raise NotImplementedError
@@ -28,48 +23,32 @@ class GameObject(Sprite):
 
 
 class Block(GameObject):
-
-    axis_rot = 45
-    rot_coef = -3
-    rot_offset_vert = axis_rot + rot_coef
-    rot_offset_hrz = axis_rot - rot_coef
-    f_up = 90
-    f_left = 180
-    f_down = 270
     
     def __init__(self, point, size=[PLATFORM_SIZE]*2):
-        super().__init__(point+size)
+        super().__init__(point+size, )
         self.image = pygame.Surface(size)
         self.image.fill(pygame.Color('#ff6262'))
-
-    def collide(self, entity): #что-то сталкивается с кубиком
-        self.entrSide = utils.u_degrees(utils.angleTo(self.rect.center, entity.rect.center))
-        if (self.f_up-self.rot_offset_vert) <= self.entrSide < (self.f_up+self.rot_offset_vert): #сверху
-            entity.rect.bottom = self.rect.top+1
-            return (True, entity.xvel, 0)
-        elif (self.f_left-self.rot_offset_hrz) <= self.entrSide < (self.f_left+self.rot_offset_hrz): #слева
-            entity.rect.right = self.rect.left
-            return (False, 0, entity.yvel+0.1)
-        elif (self.f_down-self.rot_offset_vert) <= self.entrSide < (self.f_down+self.rot_offset_vert): #снизу
-            entity.rect.top = self.rect.bottom
-            if entity.yvel < 0:
-                return (False, entity.xvel, 0)
-            return (False, entity.xvel, entity.yvel)
-        elif (360-self.rot_offset_hrz) <= self.entrSide or self.entrSide < self.rot_offset_hrz: #справа
-            entity.rect.left = self.rect.right
-            return (False, 0, entity.yvel+0.1 if entity.yvel < 0 else entity.yvel)
-        raise RuntimeError('Bad collision')
+        self.updateable = False
 
     def update(self):
         pass
-
-class JumperBlock(Block):
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.image.fill(pygame.Color('#5faa0a'))
+
+class Item(GameObject):
+    
+    def __init__(self, owner, size):
+        super().__init__(list(owner.rect.center) + size)
+        self.collideable = False
+    
+class Rope(GameObject):
+    
+    def __init__(self, owner):
+        self.size = [40, 20]
+        self.owner = owner
+        self.image = pygame.image.load("img/rope.png")
         
-    def collide(self, entity):
-        self.result = list(super().collide(entity))
-        self.result[2] = -(7*1.3)
-        return tuple(self.result)
+    def update(self):
+        self.rect.center = self.owner.rect.center
+        
+    def shoot(self):
+        pass

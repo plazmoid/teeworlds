@@ -1,71 +1,71 @@
-import socket as s
-import struct
+import socket
 import threading
+import Objects
+import World
+import pygame
+from API import TW_API, TWRequest
+from time import sleep
 
-SERV_PORT = 31338
-SERV_IP = 'localhost'
+SERVER_ADDR = ('90.157.107.41', 31337)
+ENTITIES = {}
 
-class Receiver(threading.Thread):
-    
-    def __init__(self, sock):
-        super().__init__()
-        self.sock = sock
-        self.__recvbuf = None
-        self.newdata = False
-        
-    def store(self, data): #мб в дальнейшем поменять на FIFO
-        self.__recvbuf = data
-        self.newdata = True
-
-    def get(self):
-        if self.newdata:
-            self.newdata = False
-            return self.__recvbuf
-        return False
-    
-    def run(self):
-        while 1:
-            if self.sock._closed:
-                break
-            data, addr = self.sock.recvfrom(1024)
-            if addr == (SERV_IP, SERV_PORT):
-                print('RECEIVED:', data)
-                self.store(data)
-
-class GameClient:
-
+class TWClient(TWRequest):    
     def __init__(self):
-        self.client = s.socket(s.AF_INET, s.SOCK_DGRAM, s.IPPROTO_UDP)
-        #self.client.settimeout(3)
-        self.level = 0
-        self.receiver = Receiver(self.client)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        TWRequest.__init__(self, self.sock)
+        print('Establishing connection...')
+        while not len(self.session):
+            try:
+                self.sock.connect(SERVER_ADDR)
+                self._request(TW_API.INIT)
+                self.session = self._receive()['session']
+            except socket.error as err:
+                print('wtf:', str(err))
+                sleep(1)
+                continue
+        print('Wow, such conexion')
+        #threading.Thread(target=self.updater).start()
+        ENTITIES.update({self.session: World.create_player()})
+        self.mainloop()
+        
+    def send_keys(self, key, keytype):
+        self._request(TW_API.KEY, key=key, keytype=keytype)
+        
+    def updater(self):
+        while True:
+            self._request(TW_API.UPDATE)
+            for k,v in self._receive()['updated']:
+                if k not in ENTITIES:
+                    ENTITIES[k] = World.create_player([v.x, v.y])
+                else:
+                    ENTITIES[k].rect = v
+            sleep(0.15)
+            
+    def events_handler(self):
+        e = pygame.event.poll()
+        if e.type == pygame.QUIT:
+            del self
+        elif e.type == pygame.KEYDOWN:
+            if e.key == pygame.K_ESCAPE:
+                del self
+        if e:
+            self.send_keys(e.key, e.type)
             
     def mainloop(self):
-        while 1:
-            if self.client_hello():
-                print('Соединение установлено!')
-                break
-        #вставить обработчики нажатия клавиш
-        
-    def sender(self, bindata):
-        self.client.sendto(bindata, (SERV_IP, SERV_PORT))
-        
-    def client_hello(self):
-        self.sender(b'HELLO')
-        if not self.receiver.isAlive():
-            self.receiver.start()
-        while 1:
-            if self.receiver.newdata:
-                data = struct.unpack('i2s', self.receiver.get())
-                break
-        if data[1] == b'OK':
-            self.level = data[0]
-            self.sender(b'OK')
-            return True
-        
+        level = World.LevelBuilder()
+        level.build(1)
+        window = pygame.display.set_mode(World.SCR_SIZE)
+        screen = pygame.Surface(World.SCR_SIZE)
+        while True:
+            #pygame.display.set_caption('dir: %s, xy: %s, vel: %s, %s' % (hero.dir, [hero.rect.x, hero.rect.y], [hero.xvel, round(hero.yvel, 2)], hero.onGround))
+            self.events_handler()
+            self.updater()
+            screen.fill(pygame.Color('white'))
+            Objects.OBJECTS_POOL.update()
+            Objects.OBJECTS_POOL.draw(screen)
+            window.blit(screen, (0,0))
+            pygame.display.flip()
+            pygame.time.wait(12)
+    
     def __del__(self):
-        self.sender(b'END')
-        self.client.close()
-        
-client = GameClient()
-client.mainloop()
+        self.sock.close()

@@ -1,69 +1,79 @@
-import struct
-import time
+import threading
+import World
+import Objects
+import random
+import pygame
+from API import TW_API, TWRequest
+from socketserver import BaseRequestHandler, ThreadingTCPServer
 
-import socket as s
+CLIENTS = {}
 
-#TODO: перейти на socketserver
-PORT = 31338
-lvl = 1
+class TWServerHandler(BaseRequestHandler, TWRequest):
 
-class GameServer:
+    def __init__(self, *args):
+        BaseRequestHandler.__init__(self, *args)
+        TWRequest.__init__(self, self.request)
 
-    def __init__(self):
-        self.connections = []
-        self.server = s.socket(s.AF_INET, s.SOCK_STREAM, s.IPPROTO_TCP)
-        self.server.setblocking(False)
-        #self.server.settimeout(2)
-        self.server.bind(('', PORT))
-        self.server.listen(10)
-        print('Server bound on port', PORT)
+    def handle(self):
+        while True:
+            data, self.req_addr = self._receive()
+            if data['method'] == 'INIT':
+                self.new_player()
+            elif data['method'] == 'UPDATE':
+                self.updater()
+            elif data['method'] == 'UPDATE':
+                self.keys_handler(data['key'], data['keytype'])
 
-    def receiver(self):
-        while 1:
-            try:
-                return self.server.recvfrom(1024)
-            except BlockingIOError:
-                time.sleep(0.0001)
-                continue
-
-    def serve_forever(self):
-        while 1:
-            data, addr = self.receiver()
-            if addr in self.connections:
-                if self.unpack(data, addr):
-                    self.spreadToAll(data, addr)
-            else:
-                if self.server_hello(data, addr):
-                    self.connections.append(addr)
-                    print('New:\n', self.connections)
-
-    def server_hello(self, data, addr):
-        if data == b'HELLO':
-            self.server.sendto(struct.pack('i2s', lvl, b'OK'), addr)
-            print('Hello:', addr, data)
-            if self.receiver()[0] == b'OK':
-                return True
-        return False
-
-    def unpack(self, packet, p_from):
-        if packet == b'END':
-            self.connections.remove(p_from)
-            print('Disconnecting', p_from)
-            return False
-        else:
-            print(p_from, packet)
-            return True
-    
-    def spreadToAll(self, data, sender=None):
-        for client in self.connections:
-            if client != sender:
-                self.server.sendto(data, client)
+    def new_player(self):
+        random.seed()
+        while True:
+            session = random.randint(1, 255)
+            if session not in CLIENTS:
+                break
+        CLIENTS.update({session: World.create_player()})
+        self.session = session
+        self._request(TW_API.INIT)
         
-    def isCliAlive(self): #new thread
-        pass
-        
+    def updater(self):
+        self._request(TW_API.UPDATE, updated=map(lambda k,v: (k, v.rect), CLIENTS))
+
+    def keys_handler(self, key, ktype):
+        if key == pygame.K_LEFT or key == pygame.K_a:
+            CLIENTS[self.session].keydir[0] = -1
+        if ktype == pygame.KEYDOWN:
+            if key == pygame.K_LEFT or key == pygame.K_a:
+                CLIENTS[self.session].keydir[0] = -1
+            elif key == pygame.K_RIGHT or key == pygame.K_d:
+                CLIENTS[self.session].keydir[0] = 1
+            elif key == pygame.K_UP or key == pygame.K_w:
+                CLIENTS[self.session].keydir[1] = -1
+     
+        elif ktype == pygame.KEYUP:
+            if key == pygame.K_LEFT or key == pygame.K_a:
+                CLIENTS[self.session].keydir[0] = 0
+            elif key == pygame.K_RIGHT or key == pygame.K_d:
+                CLIENTS[self.session].keydir[0] = 0
+            elif key == pygame.K_UP or key == pygame.K_w:
+                CLIENTS[self.session].keydir[1] = 0
+
     def __del__(self):
-        self.server.close()
+        CLIENTS.pop(self.session)
 
-server = GameServer()
-server.serve_forever()
+
+class TWThreadingTCPServer(ThreadingTCPServer):
+    def __init__(self, *args):
+        ThreadingTCPServer.__init__(self, *args)
+        threading.Thread(target=self.mainloop).start()
+        
+    def mainloop(self):
+        level = World.LevelBuilder()
+        level.build(1)
+        while True:
+            Objects.OBJECTS_POOL.update()
+            pygame.time.wait(12)
+        
+
+ThreadingTCPServer.allow_reuse_address = True
+server = ThreadingTCPServer(('0.0.0.0', 31337), TWServerHandler)
+server_thread = threading.Thread(target=server.serve_forever)
+server_thread.start()
