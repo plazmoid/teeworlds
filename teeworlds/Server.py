@@ -21,7 +21,7 @@ class TWServerHandler(BaseRequestHandler, TWRequest):
                 self.new_player()
             elif data['method'] == 'UPDATE':
                 self.updater()
-            elif data['method'] == 'UPDATE':
+            elif data['method'] == 'KEY':
                 self.keys_handler(data['key'], data['keytype'])
 
     def new_player(self):
