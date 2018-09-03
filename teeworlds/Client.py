@@ -6,7 +6,7 @@ from Objects import OBJECTS_POOL
 from API import *
 from time import sleep
 
-SERVER_ADDR = ('0.0.0.0', 31337)
+SERVER_ADDR = ('90.157.107.41', 31337)
 ENTITIES = {}
 
 class TWClient(TWRequest):    
@@ -24,8 +24,8 @@ class TWClient(TWRequest):
                 print('wtf:', str(err))
                 sleep(1)
                 continue
+        print('Sucks ass')
         threading.Thread(target=self._updater).start()
-        #ENTITIES.update({self.session: World.create_player()})
         self.mainloop()
         
     def send_keys(self, key, keytype):

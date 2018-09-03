@@ -5,6 +5,7 @@ from socketserver import BaseRequestHandler, ThreadingTCPServer
 import World
 import random
 import pygame
+import logging
 
 CLIENTS = {}
 lock = Lock()
@@ -12,6 +13,8 @@ lock = Lock()
 class TWServerHandler(BaseRequestHandler, TWRequest):
 
     def handle(self):
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
         TWRequest.__init__(self, self.request)
         self.handle_loop = True
         while self.handle_loop:
@@ -38,6 +41,7 @@ class TWServerHandler(BaseRequestHandler, TWRequest):
             CLIENTS.update({self: World.create_player()})
         finally:
             lock.release()
+        self.logger.info('Connected player with id: {}'.format(self.session))
         self._request(TW_API.INIT)
         
     def updater(self):
@@ -73,6 +77,7 @@ class TWServerHandler(BaseRequestHandler, TWRequest):
         self.handle_loop = False
         updated = [TW_API.UPD_PARAMS(uid=self.session, action=TW_ACTIONS.REMOVE, params='')]
         self.broadcast(TW_API.UPDATE, updated=updated)
+        self.logger.info('Player #{} disconnected'.format(self.session))
         
     def broadcast(self, *args, **kwargs):
         for client in CLIENTS:
