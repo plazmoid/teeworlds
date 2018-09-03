@@ -23,6 +23,9 @@ class GameObject(Sprite):
     
     def getXY(self):
         return (self.rect.x, self.rect.y)
+        
+    def modifier(self, obj):
+        pass
 
 
 class Block(GameObject):
@@ -35,6 +38,15 @@ class Block(GameObject):
 
     def update(self):
         pass
+    
+class JumperBlock(Block):
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.image.fill(pygame.Color('#5faa0a'))
+        
+    def modifier(self, obj):
+        obj.yvel -= 10
     
 
 class Item(GameObject):

@@ -1,10 +1,10 @@
-import World
-import random
-import pygame
 from threading import Thread, Lock
 from Objects import OBJECTS_POOL
 from API import *
 from socketserver import BaseRequestHandler, ThreadingTCPServer
+import World
+import random
+import pygame
 
 CLIENTS = {}
 lock = Lock()
@@ -95,5 +95,4 @@ class TWThreadingTCPServer(ThreadingTCPServer):
 
 ThreadingTCPServer.allow_reuse_address = True
 server = TWThreadingTCPServer(('0.0.0.0', 31337), TWServerHandler)
-server_thread = Thread(target=server.serve_forever)
-server_thread.start()
+Thread(target=server.serve_forever).start()

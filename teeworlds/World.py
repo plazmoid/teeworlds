@@ -11,7 +11,8 @@ class LevelBuilder:
     
     def __init__(self):
         self.pattern = re.compile(r'-*?\d+?(?:\:-*?\d+\W|\W)')
-        self.blocks = {'#': Objects.Block}
+        self.blocks = {'#': Objects.Block,
+                       '!': Objects.JumperBlock}
 
     def _normalize(self, s_coord):
         s_coord = int(s_coord)

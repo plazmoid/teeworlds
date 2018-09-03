@@ -3,7 +3,7 @@ import Objects, utils
 
 PLAYER_SIZE = [20,20]
 SPEED = 4
-JUMP_SPEED = SPEED + 3
+JUMP_SPEED = 7
 GRAVITY = 0.3
 FRICTION = GRAVITY*1.5
 
@@ -18,7 +18,8 @@ class Alive(Objects.GameObject):
         self.onGround = False
 
     def update(self):
-        if self.keydir[0] != 0: self.xvel = self.keydir[0]*SPEED
+        if self.keydir[0] != 0: 
+            self.xvel = self.keydir[0]*SPEED
         if self.keydir[1] == -1 and self.onGround:
             self.yvel = -JUMP_SPEED
             self.onGround = False
@@ -30,6 +31,7 @@ class Alive(Objects.GameObject):
         for block in Objects.OBJECTS_POOL:
             if block.collideable and self != block and pygame.sprite.collide_rect(self, block):
                 self.onGround, self.xvel, self.yvel = self.collide(block)
+                block.modifier(self)
         
         if not self.onGround:
             self.yvel += GRAVITY
@@ -41,7 +43,7 @@ class Alive(Objects.GameObject):
                 self.xvel -= FRICTION
             elif self.xvel < 0:
                 self.xvel += FRICTION
-                
+
     def collide(self, block):
         axis_rot = 45
         rot_coef = -3
