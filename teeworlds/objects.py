@@ -1,59 +1,45 @@
 from pygame.sprite import Sprite
+from random import randint
+from configs import PLAYER_SIZE, JUMP_SPEED, GRAVITY, FRICTION, SPEED
 import pygame
 import utils
 
-
-PLATFORM_SIZE = 30
-OBJECTS_POOL = pygame.sprite.OrderedUpdates()
-PLAYER_SIZE = [20,20]
-SPEED = 4
-JUMP_SPEED = 7
-GRAVITY = 0.3
-FRICTION = GRAVITY*1.5
-
+OBJECTS_POOL = utils.get_objects_pool()
 
 class TWObject(Sprite):
 
-    def __init__(self, sizes):
+    def __init__(self, sizes, uid=None):
         super().__init__()
         self.sizes = sizes
         self.collideable = True
-        self.rect = pygame.Rect(*sizes)
-        OBJECTS_POOL.add(self)
+        self.pickable = False
+        self.is_player = False
+        self._postInit()
+        self.rect = pygame.Rect(*self.sizes)
+        while True:
+            if uid:
+                self.uid = uid
+                break
+            self.uid = randint(0, 65535)
+            if self.uid not in OBJECTS_POOL:
+                break
+        OBJECTS_POOL.add_(self.uid, self)
 
     def update(self):
         raise NotImplementedError
 
     def __str__(self):
         return '%s(%s)' % (self.__class__, self.sizes[:2])
-    
+
     def getXY(self):
         return (self.rect.x, self.rect.y)
         
     def modifier(self, obj):
         pass
-
-
-class DefaultBlock(TWObject):
     
-    def __init__(self, point, size=[PLATFORM_SIZE]*2):
-        super().__init__(point+size, )
-        self.image = pygame.Surface(size)
-        self.image.fill(pygame.Color('#ff6262'))
-
-    def update(self):
+    def _postInit(self):
         pass
-    
-    
-class JumperBlock(DefaultBlock):
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.image.fill(pygame.Color('#5faa0a'))
-        
-    def modifier(self, obj):
-        obj.yvel -= 10
-    
+
 
 class Item(TWObject):
     
@@ -65,6 +51,7 @@ class Item(TWObject):
 class GrapplingHook(TWObject):
     
     def __init__(self, owner):
+        super().__init__((owner.rect.center))
         self.size = [40, 20]
         self.owner = owner
         self.image = pygame.image.load("img/rope.png")
@@ -78,16 +65,19 @@ class GrapplingHook(TWObject):
 
 class Player(TWObject):
     
-    def __init__(self, spawnpoint):
-        super().__init__(spawnpoint+PLAYER_SIZE)
+    def __init__(self, spawnpoint, uid=None):
+        super().__init__(spawnpoint+PLAYER_SIZE, uid=uid)
+        
+    def _postInit(self):
         self.image = pygame.image.load("img/gg.png")
         self.xvel = 0
         self.yvel = 0
-        self.keydir = [0,0]
         self.dir = 0
+        self.keydir = [0,0]
         self.onGround = False
         self.collideable = False
-        #self.rope = Rope(self)
+        self.is_player = True
+        #self.rope = Rope(self)        
 
     def update(self):
         if self.keydir[0] != 0: 
@@ -101,9 +91,12 @@ class Player(TWObject):
         self.onGround = False
 
         for obj in OBJECTS_POOL:
-            if obj.collideable and self != obj and pygame.sprite.collide_rect(self, obj):
-                self.onGround, self.xvel, self.yvel = self.collide(obj)
-                obj.modifier(self)
+            if self != obj and pygame.sprite.collide_rect(self, obj):
+                if obj.collideable:
+                    self.onGround, self.xvel, self.yvel = self.collide(obj)
+                    obj.modifier(self)
+                if obj.pickable:
+                    obj.picked(self)
         
         if not self.onGround:
             self.yvel += GRAVITY
@@ -147,4 +140,6 @@ class Player(TWObject):
 
     def lookOnMouse(self, m_pos):
         self.dir = -1 if self.rect.centerx > m_pos[0] else 1
+
+
 

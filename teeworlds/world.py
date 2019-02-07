@@ -1,16 +1,13 @@
-from objects import PLATFORM_SIZE, DefaultBlock, JumperBlock, Player
+from configs import SCR_W_COEFF, PLATFORM_SIZE
 #from pygame import Rect
 from threading import Thread
 import pygame
 import re
 import logging
+import blocks
 
-SCR_W_COEFF = 30
-SCR_H_COEFF = 16
-PF_SIZE = PLATFORM_SIZE
-SCR_SIZE = (PF_SIZE*SCR_W_COEFF, PF_SIZE*SCR_H_COEFF)
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 class GameEngine(Thread):
     
@@ -22,20 +19,24 @@ class GameEngine(Thread):
         GameEngine.curr_level = nlvl
         level = LevelBuilder()
         level.build(nlvl)
+        self.__temp_spawner()
         self.loop = True
         self.start()
+        
+    def __temp_spawner(self):
+        GameEngine
 
     def run(self):
         while self.loop:
-            self._cycle_body()
+            self._e_cycle_body()
             pygame.time.wait(12)
     
-    def _cycle_body(self):
+    def _e_cycle_body(self):
         raise NotImplementedError
     
     @staticmethod
-    def createPlayer(coords=None):
-        return Player(coords if coords else [100, 200])
+    def spawn(obj, coords, uid=None):
+        return obj(coords, uid=uid)
             
 
 class LevelBuilder:
@@ -43,8 +44,8 @@ class LevelBuilder:
     def __init__(self):
         self.pattern = re.compile(r'-*?\d+?(?:\:-*?\d+\W|\W)')
         self.blocks = {
-            '#': DefaultBlock,
-            '!': JumperBlock
+            '#': blocks.DefaultBlock,
+            '!': blocks.JumperBlock
         }
 
     def __normalize(self, s_coord):
@@ -73,7 +74,7 @@ class LevelBuilder:
         by = 0
         for row in self.__unpack(nlevel):
             for bx, block in row.items():
-                bpoint = [bx*PF_SIZE, by*PF_SIZE]
+                bpoint = [bx*PLATFORM_SIZE, by*PLATFORM_SIZE]
                 self.blocks[block](bpoint)
             by += 1
             
