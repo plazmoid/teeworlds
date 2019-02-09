@@ -40,11 +40,8 @@ class TWOrderedUpdates(OrderedUpdates):
                 OrderedUpdates.remove(self, obj)
                 del self.__uids[obj.uid]
 
-    def __getitem__(self, key):
-        try:
-            return self.__uids[key]
-        except KeyError:
-            return None
+    def __getitem__(self, uid):
+        return self.__uids.get(uid, None)
         
 
 OBJECTS_POOL = TWOrderedUpdates()

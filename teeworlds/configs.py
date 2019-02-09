@@ -1,3 +1,5 @@
+from pygame import USEREVENT
+
 # screen params
 SCR_W_COEFF = 30
 SCR_H_COEFF = 16
@@ -14,3 +16,6 @@ SPEED = 4
 JUMP_SPEED = 7
 GRAVITY = 0.3
 FRICTION = GRAVITY*1.5
+
+# events
+E_PICKED = USEREVENT + 1

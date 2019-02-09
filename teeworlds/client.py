@@ -3,10 +3,11 @@ from time import sleep
 from world import GameEngine
 from threading import Thread
 from configs import SCR_SIZE, SERV_IP, SERV_PORT
+from objects import real
 import socket
 import pygame
 import utils
-import objects
+
 
 SERVER_ADDR = (SERV_IP, SERV_PORT)
 OBJECTS_POOL = utils.get_objects_pool()
@@ -26,7 +27,7 @@ class TWClient(TWRequest, GameEngine):
                     self.window = pygame.display.set_mode(SCR_SIZE)
                     self.screen = pygame.Surface(SCR_SIZE)
                     GameEngine.__init__(self, data['nlvl'])
-                    self.player = GameEngine.spawn(objects.Player, [100, 200], uid=data['uid'])
+                    self.player = GameEngine.spawn(real.Player, [100, 200], uid=data['uid'])
                     break
             except socket.error as err:
                 GameEngine.logger.error(str(err))
@@ -34,8 +35,8 @@ class TWClient(TWRequest, GameEngine):
             else:
                 sleep(3)
         GameEngine.logger.info(f'Successfully spawned on lvl {data["nlvl"]}')
-        Thread(target=self.__updater).start()
         self.__wd = self.WatchDog(self)
+        Thread(target=self.__updater).start()
         
     
     class WatchDog(Thread):
@@ -71,7 +72,6 @@ class TWClient(TWRequest, GameEngine):
     def __updater(self):
         while self.loop:
             data = self._receive() # select/poll
-            sleep(0.001)
             if not data:
                 continue
             self.__wd.reset()
@@ -81,11 +81,13 @@ class TWClient(TWRequest, GameEngine):
                     if upd_item['action'] == TW_ACTIONS.LOCATE:
                         params = upd_item['params']
                         if not OBJECTS_POOL[uid]:
-                            GameEngine.spawn(objects.Player, params, uid=uid)
+                            GameEngine.spawn(eval(f'real.{params[0]}'), params[1:], uid=uid)
+                            #GameEngine.logger.info(f'Spawned {ob}\n{ob.uid}\n{uid}')
                         else:
-                            OBJECTS_POOL[uid].rect.x = params[0]
-                            OBJECTS_POOL[uid].rect.y = params[1]
+                            OBJECTS_POOL[uid].rect.x = params[1]
+                            OBJECTS_POOL[uid].rect.y = params[2]
                     elif upd_item['action'] == TW_ACTIONS.REMOVE:
+                        GameEngine.logger.info(f'Removed {uid}')
                         OBJECTS_POOL.remove_(uid)
             elif data['method'] == 'CLOSE':
                 self.loop = False

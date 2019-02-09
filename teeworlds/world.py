@@ -1,10 +1,10 @@
 from configs import SCR_W_COEFF, PLATFORM_SIZE
 #from pygame import Rect
 from threading import Thread
+from objects import real
 import pygame
 import re
 import logging
-import blocks
 
 
 logging.basicConfig(level=logging.INFO)
@@ -16,15 +16,12 @@ class GameEngine(Thread):
     
     def __init__(self, nlvl=1):
         super().__init__()
+        pygame.init()
         GameEngine.curr_level = nlvl
         level = LevelBuilder()
         level.build(nlvl)
-        self.__temp_spawner()
         self.loop = True
         self.start()
-        
-    def __temp_spawner(self):
-        GameEngine
 
     def run(self):
         while self.loop:
@@ -44,8 +41,8 @@ class LevelBuilder:
     def __init__(self):
         self.pattern = re.compile(r'-*?\d+?(?:\:-*?\d+\W|\W)')
         self.blocks = {
-            '#': blocks.DefaultBlock,
-            '!': blocks.JumperBlock
+            '#': real.DefaultBlock,
+            '!': real.JumperBlock
         }
 
     def __normalize(self, s_coord):

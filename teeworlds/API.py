@@ -64,8 +64,9 @@ class TWRequest:
     """
     def __init__(self, sock):
         self.logger = logging.getLogger(__name__)
-        self.sock = sock
         self.__storage = []
+        self.sock = sock
+        self.sock.setblocking(True)
 
 
     def api_init(self, nlvl=None):
@@ -85,16 +86,14 @@ class TWRequest:
 
 
     def api_update(self, entity=None, action=None, params=None, constructOnly=False):
-        
         def getparams(obj):
             return getattr(obj, params)() if params else None
         
-        updated = None
         if entity:
             if type(entity) == list: #update all
-                updated = [TW_API.UPD_PARAMS(uid=e.player.uid, action=action, params=getparams(e.player)) for e in entity]
+                updated = [TW_API.UPD_PARAMS(uid=e.uid, action=action, params=getparams(e)) for e in entity]
             else: #update a single entity
-                updated = TW_API.UPD_PARAMS(uid=entity.uid, action=action, params=getparams(entity))
+                updated = [TW_API.UPD_PARAMS(uid=entity.uid, action=action, params=getparams(entity))]
         if constructOnly:
             return partial(self._request, TW_API.UPDATE, updated=updated)
         self._request(TW_API.UPDATE, updated=updated)
@@ -112,7 +111,6 @@ class TWRequest:
 
     def _receive(self):
         if len(self.__storage):
-            #self.logger.info('STORAGE: {}'.format(self.__storage))
             try:
                 return json.loads(self.__storage.pop())
             except json.JSONDecodeError:
