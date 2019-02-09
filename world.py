@@ -9,7 +9,7 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
-class GameEngine(Thread):
+class GameEngine(Thread): # здесь крутится игровой цикл на сервере и клиенте
     
     curr_level = 0
     logger = logging.getLogger(__name__)
@@ -28,15 +28,16 @@ class GameEngine(Thread):
             self._e_cycle_body()
             pygame.time.wait(12)
     
-    def _e_cycle_body(self):
+    def _e_cycle_body(self): # все нужные действия в цикле будут выполняться отнаследованными клиентом и сервером по-разному
         raise NotImplementedError
     
     @staticmethod
-    def spawn(obj, coords, uid=None):
-        return obj(coords, uid=uid)
+    def spawn(obj, coords, uid=None): # спавн игровых объектов с учётом того, что 1 единица на координатной сетке - 1 кубик (размеры прописаны в конфиге)
+        x, y, *sizes = coords
+        return obj([x*PLATFORM_SIZE, y*PLATFORM_SIZE] + sizes, uid=uid)
             
 
-class LevelBuilder:
+class LevelBuilder: # парсер уровней
 
     def __init__(self):
         self.pattern = re.compile(r'-*?\d+?(?:\:-*?\d+\W|\W)')
@@ -51,7 +52,7 @@ class LevelBuilder:
             s_coord += SCR_W_COEFF
         return s_coord
 
-    def __unpack(self, level):
+    def __unpack(self, level): # распаковка совершенно упоротого придуманного формата
         self.result = {}
         with open('lvl%d.txt' % level, 'r') as fi:
             for row in fi:
@@ -72,7 +73,7 @@ class LevelBuilder:
         for row in self.__unpack(nlevel):
             for bx, block in row.items():
                 bpoint = [bx*PLATFORM_SIZE, by*PLATFORM_SIZE]
-                self.blocks[block](bpoint)
+                self.blocks[block](bpoint) # статические объекты уровня создаются туть
             by += 1
             
 '''

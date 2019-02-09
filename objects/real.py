@@ -1,105 +1,127 @@
-from objects.abstract import TWObject, Pickable
-from configs import PLAYER_SIZE, JUMP_SPEED, GRAVITY, FRICTION, SPEED, PLATFORM_SIZE, E_PICKED
+# Здесь собраны все реальные объекты, которые есть в игре. Их можно заспавнить и уничтожить.
+
+from objects import abstract
+from configs import PLAYER_SIZE, JUMP_SPEED, GRAVITY, FRICTION, SPEED, PLATFORM_SIZE, E_PICKED, E_REPOS, MAX_LIFES
+from pygame import math as pmath
 import pygame
 import utils
 
 OBJECTS_POOL = utils.get_objects_pool()
+picloader = utils.piccontainer
 
-class DefaultBlock(TWObject):
-    
-    def __init__(self, point, size=[PLATFORM_SIZE]*2):
-        super().__init__(point+size, )
+
+class DefaultBlock(abstract.TWObject): # блок уровня
 
     def update(self):
         pass
     
     def _postInit(self):
+        self.set_size(PLATFORM_SIZE, PLATFORM_SIZE)
         self.image = pygame.Surface(self.sizes[2:])
-        self.image.fill(pygame.Color('#ff6262'))
+        self.image.fill(pygame.Color('#905c2f'))
         
     
-class JumperBlock(DefaultBlock):
+class JumperBlock(DefaultBlock): # зачем
     
     def _postInit(self):
-        self.image = pygame.Surface(self.sizes[2:])
+        super()._postInit()
         self.image.fill(pygame.Color('#5faa0a'))
         
     def modifier(self, obj):
-        obj.yvel -= 10
+        obj.velocity.y -= 10 
     
     
 
-class Player(TWObject):
-    
-    def __init__(self, spawnpoint, uid=None):
-        super().__init__(spawnpoint+PLAYER_SIZE, uid=uid)
+class Player(abstract.TWObject): # даже игрок наследуется от TWObject, что позволяет ему иметь свой uid и упрощать клиент-серверное общение
         
     def _postInit(self):
+        self.set_size(*PLAYER_SIZE)
         self.image = pygame.image.load("img/gg.png")
-        self.xvel = 0
-        self.yvel = 0
+        self.velocity = pmath.Vector2(0, 0) # скорость представляем в виде вектора для удобства
+        self.keydir = pmath.Vector2(0, 0) # как и нажатые клавиши
         self.dir = 0
-        self.keydir = [0,0]
         self.onGround = False
-        self.collideable = False
-        self.is_player = True
-        #self.rope = Rope(self)        
+        self.collideable = False # игроки не сталкиваются
+        self.lifes = 2
+        self.weapons = {} # здесь валяется всё оружие игрока
 
-    def update(self):
-        if self.keydir[0] != 0: 
-            self.xvel = self.keydir[0]*SPEED
-        if self.keydir[1] == -1 and self.onGround:
-            self.yvel -= JUMP_SPEED
-            self.onGround = False
+    def update(self): # физика, физика
+        self.old_rect = self.rect.center
+        if self.keydir.x != 0: 
+            self.velocity.x = self.keydir.x*SPEED
+        if self.keydir.y == -1 and self.onGround:
+            self.velocity.y -= JUMP_SPEED
         
-        self.rect.x += self.xvel
-        self.rect.y += self.yvel
         self.onGround = False
+        self.rect.x += self.velocity.x
+        self.rect.y += self.velocity.y
 
-        for obj in OBJECTS_POOL:
+        for obj in OBJECTS_POOL: # проверки на столкновения с объектами на уровне
             if self != obj and pygame.sprite.collide_rect(self, obj):
                 if obj.collideable:
-                    self.onGround, self.xvel, self.yvel = self.collide(obj)
+                    self.collide(obj)
                     obj.modifier(self)
                 if obj.pickable:
                     obj.picked_by(self)
         
         if not self.onGround:
-            self.yvel += GRAVITY
+            self.velocity.y += GRAVITY # гравитацией снижаем высоту прыга
         
-        if abs(self.xvel) <= FRICTION:
-            self.xvel = 0
+        if abs(self.velocity.x) <= FRICTION: # а трением не даём скользить из стены в стену
+            self.velocity.x = 0
         else:
-            if self.xvel > 0:
-                self.xvel -= FRICTION
-            elif self.xvel < 0:
-                self.xvel += FRICTION
+            if self.velocity.x > 0:
+                self.velocity.x -= FRICTION
+            elif self.velocity.x < 0:
+                self.velocity.x += FRICTION
+        #if self.rect.center != self.old_rect:
+        #    pygame.event.post(pygame.event.Event(E_REPOS))    
+                
 
     def collide(self, block):
         axis_rot = 45
-        rot_coef = -3
+        rot_coef = -1
         rot_offset_vert = axis_rot + rot_coef
         rot_offset_hrz = axis_rot - rot_coef
         f_up = 90
         f_left = 180
         f_down = 270
-        entrSide = utils.u_degrees(utils.angleTo(block.rect.center, self.rect.center))
+        entrSide = utils.u_degrees(utils.angleTo(block.rect.center, self.rect.center)) # матааааааан, который понимает, столкнулись ли мы
         if (f_up-rot_offset_vert) <= entrSide < (f_up+rot_offset_vert): #сверху
             self.rect.bottom = block.rect.top+1
-            return (True, self.xvel, 0)
+            self.onGround = True
+            self.velocity.y = 0
         elif (f_left-rot_offset_hrz) <= entrSide < (f_left+rot_offset_hrz): #слева
-            self.rect.right = block.rect.left
-            return (False, 0, self.yvel)
+            self.rect.right = block.rect.left-1
+            self.velocity.x = 0
         elif (f_down-rot_offset_vert) <= entrSide < (f_down+rot_offset_vert): #снизу
             self.rect.top = block.rect.bottom
-            if self.yvel < 0:
-                return (False, self.xvel, 0)
-            return (False, self.xvel, self.yvel)
+            if self.velocity.y < 0:
+                self.velocity.y = 0
         elif (360-rot_offset_hrz) <= entrSide or entrSide < rot_offset_hrz: #справа
-            self.rect.left = block.rect.right
-            return (False, 0, self.yvel)
+            self.rect.left = block.rect.right+1
+            self.velocity.x = 0
+        
+        
+    def drawings(self, surface):
+        #myfont = pygame.font.SysFont('Sans Serif', 30)
+        #txt = f'{self.lifes}'
+        #textsurface = myfont.render(txt, False, (0, 0, 0))
+        #surface.blit(textsurface,(0,0))
+        
+        heart_full = picloader.get('heart_full').pic # рисуем шкалу здоровья
+        heart_empty = picloader.get('heart_empty').pic
+        h_draw_coeff = 70
+        for h in range(MAX_LIFES):
+            h_img = heart_full if h+1 <= self.lifes else heart_empty
+            surface.blit(h_img, (h*h_draw_coeff, 5))
+            
+            
+    def weaponize(self, weapon_name):
+        self.weapons[weapon_name] = WPN_CATALOG[weapon_name](self) # вооружаем игрока чем-нибудь
+        
 
-###################################just becoz
+###################################just becoz # пригодится для прицела
     def moveAfterMouse(self, mouse_pos):
         self.angle = utils.angleTo(self.rect.center, mouse_pos)
         self.xvel, self.yvel = utils.toRectCoords(10, self.angle)
@@ -108,28 +130,33 @@ class Player(TWObject):
         self.dir = -1 if self.rect.centerx > m_pos[0] else 1
 
 
-class Heart(Pickable):
+class Heart(abstract.Pickable): # подбираемое сердечко, восстанавливает одну хпшчку
     
     def _postInit(self):
-        self.image = pygame.Surface(self.sizes[2:])
-        self.image.fill(pygame.Color('#ff33b8'))
+        super()._postInit()
+        self.image = picloader.get['heart_loot'].pic
 
     def picked_by(self, entity):
-        print(f'{entity} picked a heart: {self}, {self.uid}')
-        pygame.event.post(pygame.event.Event(E_PICKED, author=entity, target=self))    
+        if entity.lifes <= MAX_LIFES:
+            entity.lifes += 1
+        pygame.event.post(pygame.event.Event(E_PICKED, author=entity, target=self))
         
     
-class GrapplingHook(TWObject):
+class GrapplingHook(abstract.Weapon):
     
-    def __init__(self, owner):
-        super().__init__((owner.rect.center))
-        self.size = [40, 20]
-        self.owner = owner
-        self.image = pygame.image.load("img/rope.png")
+    def _postInit(self):
+        self.wh, self.image = picloader.get('hook').draw_ready()
+        self.set_size(*self.wh)
         
-    def update(self):
-        self.rect.center = self.owner.rect.center
         
     def shoot(self):
         pass
     
+    
+#class Hammer(abstract.Weapon):
+    
+    
+WPN_CATALOG = {
+    'hook': GrapplingHook
+}
+

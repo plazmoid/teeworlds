@@ -2,7 +2,7 @@ from API import *
 from time import sleep
 from world import GameEngine
 from threading import Thread
-from configs import SCR_SIZE, SERV_IP, SERV_PORT
+from configs import SCR_SIZE, SERV_IP, SERV_PORT, E_PICKED
 from objects import real
 import socket
 import pygame
@@ -12,22 +12,24 @@ import utils
 SERVER_ADDR = (SERV_IP, SERV_PORT)
 OBJECTS_POOL = utils.get_objects_pool()
 
-class TWClient(TWRequest, GameEngine):
+class TWClient(TWRequest, GameEngine): # клиент тоже наследует игровой движок, но уже с немного другими операциями в игровом цикле
     
     def __init__(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
         TWRequest.__init__(self, self.sock)
         GameEngine.logger.info('Connecting to ' + str(SERVER_ADDR))
         while True:
             try:
                 self.sock.connect(SERVER_ADDR)
-                self.api_init()
+                self.api_init() # при успешном подключении запрашиваем свой uid и номер уровня
                 data = self._receive()
                 if data['method'] == 'INIT':
-                    self.window = pygame.display.set_mode(SCR_SIZE)
+                    self.window = pygame.display.set_mode(SCR_SIZE) # при успешной инициализации на сервере врубаем графоний
                     self.screen = pygame.Surface(SCR_SIZE)
-                    GameEngine.__init__(self, data['nlvl'])
-                    self.player = GameEngine.spawn(real.Player, [100, 200], uid=data['uid'])
+                    pygame.font.init()
+                    GameEngine.__init__(self, data['nlvl']) # и игровой цикл
+                    self.player = GameEngine.spawn(real.Player, [0, 0], uid=data['uid'])
+                    self.player.weaponize('hook') # вооружаем свежесозданного игрока гарпуном
                     break
             except socket.error as err:
                 GameEngine.logger.error(str(err))
@@ -36,10 +38,10 @@ class TWClient(TWRequest, GameEngine):
                 sleep(3)
         GameEngine.logger.info(f'Successfully spawned on lvl {data["nlvl"]}')
         self.__wd = self.WatchDog(self)
-        Thread(target=self.__updater).start()
+        Thread(target=self.__update_daemon).start()
         
     
-    class WatchDog(Thread):
+    class WatchDog(Thread): # простой вачдог, вырубающий клиент игры при потере соединения с сервером
         
         def __init__(self, outer):
             super().__init__()
@@ -49,67 +51,89 @@ class TWClient(TWRequest, GameEngine):
             self.ping_att = 2
             self.start()
             
-        def run(self):
+        def run(self): # наблюдает в отдельном потоке, потому никому не мешает
             tick = 0.1
             while self.outer.loop:
                 while self.__wd_timer > 0:
                     self.__wd_timer -= tick
                     if not self.outer.loop:
                         break
-                    if self.__wd_timer < (self.__WD_TIMER_RST // 2):
+                    if self.__wd_timer < (self.__WD_TIMER_RST // 2): # если таймер приближается к критической отметке
                         try:
-                            self.outer.api_ping()
+                            self.outer.api_ping() # последние разы пытаемся пингануть (зачем)
                         except: 
                             break
                     sleep(tick)
-                if self.outer.loop:
+                if self.outer.loop: # и вырубаем клиент
                     self.outer.close()
                     
-        def reset(self):
+        def reset(self): # не даём псине отключить нас, когда всё работает
             self.__wd_timer = self.__WD_TIMER_RST
                     
         
-    def __updater(self):
+    def __update_daemon(self): # принимаем обновления от сервера (тоже в отдельном потоке)
         while self.loop:
-            data = self._receive() # select/poll
+            data = self._receive()
             if not data:
                 continue
-            self.__wd.reset()
+            self.__wd.reset() # обновляем собаку-надсмотрщика
             if data['method'] == 'UPDATE':
                 for upd_item in data['updated']:
                     uid = upd_item['uid']
                     if upd_item['action'] == TW_ACTIONS.LOCATE:
                         params = upd_item['params']
-                        if not OBJECTS_POOL[uid]:
-                            GameEngine.spawn(eval(f'real.{params[0]}'), params[1:], uid=uid)
+                        if not OBJECTS_POOL[uid]: # если пытаемся обновить местоположение не существующего на клиенте объекта, то создаём его
+                            GameEngine.spawn(eval(f'real.{params[0]}'), params[1:], uid=uid) # впервые в жизни мне пригодился eval
                             #GameEngine.logger.info(f'Spawned {ob}\n{ob.uid}\n{uid}')
                         else:
-                            OBJECTS_POOL[uid].rect.x = params[1]
+                            OBJECTS_POOL[uid].rect.x = params[1] # иначе обновляем позицию
                             OBJECTS_POOL[uid].rect.y = params[2]
                     elif upd_item['action'] == TW_ACTIONS.REMOVE:
-                        GameEngine.logger.info(f'Removed {uid}')
-                        OBJECTS_POOL.remove_(uid)
+                        OBJECTS_POOL.remove_(uid) # удаляем объект по uid-у
             elif data['method'] == 'CLOSE':
                 self.loop = False
             
             
     def events_handler(self):
         e = pygame.event.poll()
-        if e.type == pygame.QUIT:
-            self.loop = False
-        elif e.type == pygame.KEYDOWN:
-            if e.key == pygame.K_ESCAPE:
-                self.loop = False
         if e.type == pygame.KEYDOWN or e.type == pygame.KEYUP:
-            self.api_key(e.key, e.type)
+            self.api_key(e.key, e.type) # нажали или отжали клавишу - рапортуем серверу
+            
+        #if e.type == E_REPOS: # попытка запилить отправку обновлений при изменении позиции ГГ
+        #    self.api_update(self.player, TW_ACTIONS.LOCATE)
+        
+        elif e.type == E_PICKED: #TODO: допилить сердечки
+            self.api_interact(target=e.target.uid)
+            
+        if e.type == pygame.QUIT: # при закрытии клиента завершаем сразу же все потоки
+            self.loop = False
+            
+        if e.type == pygame.KEYDOWN:
+            if e.key == pygame.K_LEFT or e.key == pygame.K_a:
+                self.player.keydir.x = -1
+            elif e.key == pygame.K_RIGHT or e.key == pygame.K_d:
+                self.player.keydir.x = 1
+            elif e.key == pygame.K_UP or e.key == pygame.K_w:
+                self.player.keydir.y = -1
+            elif e.key == pygame.K_ESCAPE:
+                self.loop = False
+                
+        if e.type == pygame.KEYUP:
+            if e.key == pygame.K_LEFT or e.key == pygame.K_a:
+                self.player.keydir.x = 0
+            elif e.key == pygame.K_RIGHT or e.key == pygame.K_d:
+                self.player.keydir.x = 0
+            elif e.key == pygame.K_UP or e.key == pygame.K_w:
+                self.player.keydir.y = 0
 
 
-    def _e_cycle_body(self):
+    def _e_cycle_body(self): # клиенту в игровом цикле уже требуется отрисовка
         self.events_handler()
         self.screen.fill(pygame.Color('white'))
-        OBJECTS_POOL.update()
-        OBJECTS_POOL.draw(self.screen)
+        OBJECTS_POOL.update() # поэтому обновляем
+        OBJECTS_POOL.draw(self.screen) # и отрисовываем
         self.window.blit(self.screen, (0,0))
+        OBJECTS_POOL.custom_draw(self.window) # и ещё раз отрисовываем что-нибудь поверх, полоску здоровья ту же
         pygame.display.flip()
     
     

@@ -5,25 +5,27 @@ from socketserver import BaseRequestHandler, ThreadingTCPServer
 from world import GameEngine
 from objects import real
 from configs import E_PICKED
+from random import randint
 import pygame
 import utils
 
 
-CLIENTS = {}
+
+CLIENTS = {} # {наследник TWObject: сущность TWServerHandler}
 OBJECTS_POOL = utils.get_objects_pool()
 lock = Lock()
 
-class TWServerHandler(BaseRequestHandler, TWRequest): # разделить логику на соединение и обработку
+class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик одного соединения, крутится в отдельном потоке
 
     def handle(self):
-        TWRequest.__init__(self, self.request)
+        TWRequest.__init__(self, self.request) # всё лезущее в сеть наследуется от TWRequest и использует его методы, чтобы лезть правильно
         self.loop = True
         while self.loop:
             try:
-                data = self._receive()
+                data = self._receive() # не отказываем себе в удовольствии понять полезность блокирующих сокетов
             except ConnectionResetError:
                 try:
-                    self.remove_player()
+                    self.remove_player() # игрок отпал - вырубаем его на сервере с последующей рассылкой
                 except:
                     continue
             if not data:
@@ -36,99 +38,99 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # разделить ло�
                 self.keys_handler(data)
             elif data['method'] == 'PING':
                 self.api_ping()
-            #elif data['method'] == 'UPDATE':
-                #self.updater()
+            elif data['method'] == 'INTERACT':
+                serv.remove_object(data['target']) # перепилить это, это под взаимодействия игроков
+            elif data['method'] == 'UPDATE':
+                serv.broadcast('api_update', self.player, TW_ACTIONS.LOCATE, 'getXY') # когда клиент ну очень хочет сам обновиться
+                
                 
 
     def new_player(self):
-        self.player = GameEngine.spawn(real.Player, [100, 200])
-        self.api_init(GameEngine.curr_level)
+        self.player = GameEngine.spawn(real.Player, [10, 2])
+        self.api_init(GameEngine.curr_level) # только созданному игроку отправляется его uid (берётся в TWRequest) и номер загруженного на сервере уровня
         with lock:
-            CLIENTS[self.player] = self
+            CLIENTS[self.player] = self # добавляем себя в глобальную таблицу клиентов
         GameEngine.logger.info(f'Connected player #{self.player.uid}')
-        Thread(target=self.__updater).start()
+        serv.broadcast('api_update', self.player, TW_ACTIONS.LOCATE, 'getXY') # широковещаем всем игрокам, что мы родились
+        Thread(target=self.__update_daemon).start() # стартуем рассылку клиенту обновлений всех других игроков
         
         
-    def __updater(self):
+    def __update_daemon(self):
         while self.loop:
             self.api_update(list(CLIENTS) + serv.get_dynamic_objects(), TW_ACTIONS.LOCATE, 'getXY')
             sleep(0.01)
 
 
-    def keys_handler(self, data):
-        key = data['key']
+    def keys_handler(self, data): # игрок на клиенте перемещается вместе с игроком на сервере не дожидаясь возможно запоздалого ответа от сервера,
+        key = data['key'] # соединение лишь синхронизирует их
         ktype = data['keytype']
-        if key == pygame.K_LEFT or key == pygame.K_a:
-            self.player.keydir[0] = -1
         if ktype == pygame.KEYDOWN:
             if key == pygame.K_LEFT or key == pygame.K_a:
-                self.player.keydir[0] = -1
+                self.player.keydir.x = -1
             elif key == pygame.K_RIGHT or key == pygame.K_d:
-                self.player.keydir[0] = 1
+                self.player.keydir.x = 1
             elif key == pygame.K_UP or key == pygame.K_w:
-                self.player.keydir[1] = -1
+                self.player.keydir.y = -1
      
         elif ktype == pygame.KEYUP:
             if key == pygame.K_LEFT or key == pygame.K_a:
-                self.player.keydir[0] = 0
+                self.player.keydir.x = 0
             elif key == pygame.K_RIGHT or key == pygame.K_d:
-                self.player.keydir[0] = 0
+                self.player.keydir.x = 0
             elif key == pygame.K_UP or key == pygame.K_w:
-                self.player.keydir[1] = 0
+                self.player.keydir.y = 0
         
-        
-    def remove_object(self, obj):
-        OBJECTS_POOL.remove_(obj)
-        self.broadcast(self.api_update(obj, TW_ACTIONS.REMOVE, constructOnly=True))
-
 
     def remove_player(self):
-        with lock:
+        with lock: # потокобезопасно удаляем игрока из всех таблиц
             del CLIENTS[self.player]
-        OBJECTS_POOL.remove_(self.player)
-        self.loop = False
-        self.broadcast(self.api_update(self.player, TW_ACTIONS.REMOVE, constructOnly=True))
+        OBJECTS_POOL.remove_(self.player) # а OBJECTS_POOL безопасен уже внутри реализации (utils.py)
+        self.loop = False # завершаем для этого игрока игровой цикл
+        serv.broadcast('api_update', self.player, TW_ACTIONS.REMOVE) # и говорим всем, что он отвалился
         GameEngine.logger.info(f'Player #{self.player.uid} disconnected')
         
-        
-    def broadcast(self, req):
-        for client in CLIENTS.values():
-            print(f'REQ {req} ||| {client}')
-            client.req()
-                
 
 
-class TWServer(ThreadingTCPServer, GameEngine):
+
+class TWServer(ThreadingTCPServer, GameEngine): # игровой сервер помимо ожидания подключений крутит и игровой цикл
     
     def __init__(self, *args, nlvl=1):
         ThreadingTCPServer.__init__(self, *args)
         GameEngine.__init__(self, nlvl=nlvl)
-        Thread(target=self.__temp_spawner).start()
+        Thread(target=self.__temp_spawner).start() # тестовый спавнер (зачем)
         
         
-    def _e_cycle_body(self):
+    def _e_cycle_body(self): # в цикле сервера не нужно ничего отрисовывать, просто обрабатываем события и обновляем состояния игровых объектов
         self.events_handler()
         OBJECTS_POOL.update()
         
     
     def events_handler(self):
         e = pygame.event.poll()
-        if e.type == E_PICKED:
-            print(vars(CLIENTS[e.author]))
-            CLIENTS[e.author].remove_object(e.target)
+        if e.type == E_PICKED: # кто-то что-то хапнул на карте
+            
+            self.remove_object(e.target)
         
-        
-    def get_dynamic_objects(self):
+    
+    def get_dynamic_objects(self): # получить все динамические (созданные через GameEngine.spawn) объекты для их обновления и рассылки обновлений всем клиентам
         return list(filter(lambda obj: obj.pickable, OBJECTS_POOL))
         
         
-    def __temp_spawner(self):
-        GameEngine.spawn(real.Heart, [160, 260])
-        GameEngine.spawn(real.Heart, [200, 260])
-        sleep(5)
-        GameEngine.spawn(real.Heart, [240, 260])
-    
+    def remove_object(self, obj): # удаление теоретически любого объекта с дальнейшей рассылкой об удалении
+        OBJECTS_POOL.remove_(obj)
+        serv.broadcast('api_update', obj, TW_ACTIONS.REMOVE)
 
+        
+    def broadcast(self, method, *args, **kwargs):
+        for client in CLIENTS.values():
+            getattr(client, method)(*args, **kwargs)
+            
+        
+    def __temp_spawner(self):
+        while True:
+            GameEngine.spawn(real.Heart, [randint(0, 25), randint(0, 25)])
+            sleep(randint(5, 8))
+    
 
 ThreadingTCPServer.allow_reuse_address = True
 serv = TWServer(('0.0.0.0', 31337), TWServerHandler, nlvl=1)
