@@ -7,7 +7,7 @@ import re
 import logging
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 class GameEngine(Thread): # здесь крутится игровой цикл на сервере и клиенте
     
@@ -17,6 +17,8 @@ class GameEngine(Thread): # здесь крутится игровой цикл 
     def __init__(self, nlvl=1):
         super().__init__()
         pygame.init()
+        pygame.font.init()
+        pygame.event.set_blocked(pygame.MOUSEMOTION) # чтоб движения мышки не забивали очередь событий
         GameEngine.curr_level = nlvl
         level = LevelBuilder()
         level.build(nlvl)
@@ -28,13 +30,15 @@ class GameEngine(Thread): # здесь крутится игровой цикл 
             self._e_cycle_body()
             pygame.time.wait(12)
     
-    def _e_cycle_body(self): # все нужные действия в цикле будут выполняться отнаследованными клиентом и сервером по-разному
+    # все нужные действия в цикле будут выполняться отнаследованными клиентом и сервером по-разному
+    def _e_cycle_body(self): 
         raise NotImplementedError
     
+    # спавн игровых объектов с учётом того, что 1 единица на координатной сетке = 1 кубик (размеры прописаны в конфиге)
     @staticmethod
-    def spawn(obj, coords, uid=None): # спавн игровых объектов с учётом того, что 1 единица на координатной сетке - 1 кубик (размеры прописаны в конфиге)
+    def spawn(obj, coords, uid=None, *args, **kwargs): 
         x, y, *sizes = coords
-        return obj([x*PLATFORM_SIZE, y*PLATFORM_SIZE] + sizes, uid=uid)
+        return obj([x*PLATFORM_SIZE, y*PLATFORM_SIZE] + sizes, uid=uid, *args, **kwargs)
             
 
 class LevelBuilder: # парсер уровней

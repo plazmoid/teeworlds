@@ -38,11 +38,22 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
                 self.keys_handler(data)
             elif data['method'] == 'PING':
                 self.api_ping()
-            elif data['method'] == 'INTERACT':
-                serv.remove_object(data['target']) # перепилить это, это под взаимодействия игроков
+            #elif data['method'] == 'INTERACT':
+            #    serv.remove_object(data['target']) # перепилить это под взаимодействия игроков
             elif data['method'] == 'UPDATE':
-                serv.broadcast('api_update', self.player, TW_ACTIONS.LOCATE, 'getXY') # когда клиент ну очень хочет сам обновиться
+                self.updater(data)
                 
+                
+    def updater(self, data):
+        for upd_item in data['updated']:
+            if upd_item['action'] == TW_ACTIONS.LOCATE:
+                if upd_item['uid'] == self.player.uid:
+                    params = upd_item['params']
+                    self.player.rect.center = params['coords'] # иначе обновляем позицию
+                    self.player.dir = params['dir']
+                    serv.broadcast('api_update', self.player, TW_ACTIONS.LOCATE, 'get_state') # когда клиент ну очень хочет сам обновиться
+            elif upd_item['action'] == TW_ACTIONS.REMOVE:
+                serv.remove_object(upd_item['uid'])
                 
 
     def new_player(self):
@@ -51,14 +62,14 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
         with lock:
             CLIENTS[self.player] = self # добавляем себя в глобальную таблицу клиентов
         GameEngine.logger.info(f'Connected player #{self.player.uid}')
-        serv.broadcast('api_update', self.player, TW_ACTIONS.LOCATE, 'getXY') # широковещаем всем игрокам, что мы родились
-        Thread(target=self.__update_daemon).start() # стартуем рассылку клиенту обновлений всех других игроков
+        serv.broadcast('api_update', self.player, TW_ACTIONS.LOCATE, 'get_state') # широковещаем всем игрокам, что мы родились
+        Thread(target=self.__update_daemon).start()
         
         
-    def __update_daemon(self):
+    def __update_daemon(self): # собираем обновления от всех других игроков
         while self.loop:
-            self.api_update(list(CLIENTS) + serv.get_dynamic_objects(), TW_ACTIONS.LOCATE, 'getXY')
-            sleep(0.01)
+            self.api_update(list(CLIENTS) + serv.get_dynamic_objects(), TW_ACTIONS.LOCATE, 'get_state')
+            sleep(0.03)
 
 
     def keys_handler(self, data): # игрок на клиенте перемещается вместе с игроком на сервере не дожидаясь возможно запоздалого ответа от сервера,

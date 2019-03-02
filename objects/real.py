@@ -5,9 +5,11 @@ from configs import PLAYER_SIZE, JUMP_SPEED, GRAVITY, FRICTION, SPEED, PLATFORM_
 from pygame import math as pmath
 import pygame
 import utils
+import datatypes
+
 
 OBJECTS_POOL = utils.get_objects_pool()
-picloader = utils.piccontainer
+picloader = datatypes.piccontainer
 
 
 class DefaultBlock(abstract.TWObject): # блок уровня
@@ -16,8 +18,7 @@ class DefaultBlock(abstract.TWObject): # блок уровня
         pass
     
     def _postInit(self):
-        self.set_size(PLATFORM_SIZE, PLATFORM_SIZE)
-        self.image = pygame.Surface(self.sizes[2:])
+        self.image = pygame.Surface((PLATFORM_SIZE, PLATFORM_SIZE))
         self.image.fill(pygame.Color('#905c2f'))
         
     
@@ -34,18 +35,32 @@ class JumperBlock(DefaultBlock): # зачем
 
 class Player(abstract.TWObject): # даже игрок наследуется от TWObject, что позволяет ему иметь свой uid и упрощать клиент-серверное общение
         
+    def __init__(self, *args, client=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.client = client # является ли игрок нами
+        
+        
     def _postInit(self):
-        self.set_size(*PLAYER_SIZE)
         self.image = pygame.image.load("img/gg.png")
         self.velocity = pmath.Vector2(0, 0) # скорость представляем в виде вектора для удобства
         self.keydir = pmath.Vector2(0, 0) # как и нажатые клавиши
-        self.dir = 0
+        self.dir = (0, 0)
         self.onGround = False
         self.collideable = False # игроки не сталкиваются
         self.lifes = 2
         self.weapons = {} # здесь валяется всё оружие игрока
 
+
+    def get_state(self):
+        state = super().get_state()
+        state['dir'] = self.dir
+        state['lifes'] = self.lifes
+        return state
+        
+
     def update(self): # физика, физика
+        if self.client:
+            self.dir = pygame.mouse.get_pos()
         self.old_rect = self.rect.center
         if self.keydir.x != 0: 
             self.velocity.x = self.keydir.x*SPEED
@@ -104,18 +119,18 @@ class Player(abstract.TWObject): # даже игрок наследуется о
         
         
     def drawings(self, surface):
-        #myfont = pygame.font.SysFont('Sans Serif', 30)
-        #txt = f'{self.lifes}'
-        #textsurface = myfont.render(txt, False, (0, 0, 0))
-        #surface.blit(textsurface,(0,0))
+        if self.client:
+#             myfont = pygame.font.SysFont('Sans Serif', 25)
+#             txt = f'{self.dir}'
+#             textsurface = myfont.render(txt, False, (0, 0, 0))
+#             surface.blit(textsurface,(0,60))
+            heart_full = picloader.get('heart_full').pic # рисуем шкалу здоровья
+            heart_empty = picloader.get('heart_empty').pic
+            h_draw_coeff = 70
+            for h in range(MAX_LIFES):
+                h_img = heart_full if h+1 <= self.lifes else heart_empty
+                surface.blit(h_img, (h*h_draw_coeff, 5))
         
-        heart_full = picloader.get('heart_full').pic # рисуем шкалу здоровья
-        heart_empty = picloader.get('heart_empty').pic
-        h_draw_coeff = 70
-        for h in range(MAX_LIFES):
-            h_img = heart_full if h+1 <= self.lifes else heart_empty
-            surface.blit(h_img, (h*h_draw_coeff, 5))
-            
             
     def weaponize(self, weapon_name):
         self.weapons[weapon_name] = WPN_CATALOG[weapon_name](self) # вооружаем игрока чем-нибудь
@@ -124,7 +139,6 @@ class Player(abstract.TWObject): # даже игрок наследуется о
 ###################################just becoz # пригодится для прицела
     def moveAfterMouse(self, mouse_pos):
         self.angle = utils.angleTo(self.rect.center, mouse_pos)
-        self.xvel, self.yvel = utils.toRectCoords(10, self.angle)
 
     def lookOnMouse(self, m_pos):
         self.dir = -1 if self.rect.centerx > m_pos[0] else 1
@@ -134,7 +148,8 @@ class Heart(abstract.Pickable): # подбираемое сердечко, во�
     
     def _postInit(self):
         super()._postInit()
-        self.image = picloader.get['heart_loot'].pic
+        self.image = picloader.get('heart_loot').pic
+        
 
     def picked_by(self, entity):
         if entity.lifes <= MAX_LIFES:
@@ -145,14 +160,13 @@ class Heart(abstract.Pickable): # подбираемое сердечко, во�
 class GrapplingHook(abstract.Weapon):
     
     def _postInit(self):
-        self.wh, self.image = picloader.get('hook').draw_ready()
-        self.set_size(*self.wh)
+        self.image = picloader.get('hook').pic
         
         
     def shoot(self):
         pass
-    
-    
+
+
 #class Hammer(abstract.Weapon):
     
     
