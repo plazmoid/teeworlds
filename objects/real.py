@@ -17,14 +17,14 @@ class DefaultBlock(abstract.TWObject): # блок уровня
     def update(self):
         pass
     
-    def _postInit(self):
+    def _postInit(self, *args, **kwargs):
         self.image = pygame.Surface((PLATFORM_SIZE, PLATFORM_SIZE))
         self.image.fill(pygame.Color('#905c2f'))
         
     
 class JumperBlock(DefaultBlock): # зачем
     
-    def _postInit(self):
+    def _postInit(self, *args, **kwargs):
         super()._postInit()
         self.image.fill(pygame.Color('#5faa0a'))
         
@@ -35,19 +35,16 @@ class JumperBlock(DefaultBlock): # зачем
 
 class Player(abstract.TWObject): # даже игрок наследуется от TWObject, что позволяет ему иметь свой uid и упрощать клиент-серверное общение
         
-    def __init__(self, *args, client=False, **kwargs):
-        super().__init__(*args, **kwargs)
+        
+    def _postInit(self, client=False):
         self.client = client # является ли игрок нами
-        
-        
-    def _postInit(self):
         self.image = pygame.image.load("img/gg.png")
         self.velocity = pmath.Vector2(0, 0) # скорость представляем в виде вектора для удобства
         self.keydir = pmath.Vector2(0, 0) # как и нажатые клавиши
         self.dir = (0, 0)
         self.onGround = False
         self.collideable = False # игроки не сталкиваются
-        self.lifes = 2
+        self.lifes = 2 
         self.weapons = {} # здесь валяется всё оружие игрока
 
 
@@ -55,6 +52,7 @@ class Player(abstract.TWObject): # даже игрок наследуется о
         state = super().get_state()
         state['dir'] = self.dir
         state['lifes'] = self.lifes
+        state['vel'] = (self.velocity.x, self.velocity.x)
         return state
         
 
@@ -152,7 +150,7 @@ class Heart(abstract.Pickable): # подбираемое сердечко, во�
         
 
     def picked_by(self, entity):
-        if entity.lifes <= MAX_LIFES:
+        if entity.lifes <= MAX_LIFES and entity.client:
             entity.lifes += 1
         pygame.event.post(pygame.event.Event(E_PICKED, author=entity, target=self))
         

@@ -16,9 +16,9 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
     
     def __init__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+        self.sock.setblocking(True)
         TWRequest.__init__(self, self.sock)
         GameEngine.logger.info('Connecting to ' + str(SERVER_ADDR))
-        self.key_pressed = False
         while True:
             try:
                 self.sock.connect(SERVER_ADDR)
@@ -29,7 +29,7 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
                     self.screen = pygame.Surface(SCR_SIZE)
                     GameEngine.__init__(self, data['nlvl']) # и игровой цикл
                     self.player = GameEngine.spawn(real.Player, [0, 0], uid=data['uid'], client=True)
-                    self.player.weaponize('hook') # вооружаем свежесозданного игрока гарпуном
+                    #self.player.weaponize('hook') # вооружаем свежесозданного игрока гарпуном
                     break
             except socket.error as err:
                 GameEngine.logger.error(str(err))
@@ -97,7 +97,7 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
             
     def events_handler(self):
         e = pygame.event.poll()
-        #if e.type == pygame.KEYDOWN or e.type == pygame.KEYUP: #self.api_key(e.key, e.type) # нажали или отжали клавишу - рапортуем серверу
+        if e.type == pygame.KEYDOWN or e.type == pygame.KEYUP: self.api_key(e.key, e.type) # нажали или отжали клавишу - рапортуем серверу
             
         #if e.type == E_REPOS: # попытка запилить отправку обновлений при изменении позиции ГГ
         #    self.api_update(self.player, TW_ACTIONS.LOCATE)
@@ -117,7 +117,6 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
                 self.player.keydir.y = -1
             elif e.key == pygame.K_ESCAPE:
                 self.loop = False
-            self.key_pressed = True
                 
         if e.type == pygame.KEYUP:
             if e.key == pygame.K_LEFT or e.key == pygame.K_a:
@@ -126,9 +125,6 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
                 self.player.keydir.x = 0
             elif e.key == pygame.K_UP or e.key == pygame.K_w:
                 self.player.keydir.y = 0
-            self.key_pressed = False
-        if hasattr(self, 'player') and self.key_pressed:
-            self.api_update(self.player, TW_ACTIONS.LOCATE, 'get_state')
 
 
     def _e_cycle_body(self): # клиенту в игровом цикле уже требуется отрисовка
@@ -156,4 +152,5 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
         self.close()
 
 
-TWClient()
+if __name__ == '__main__':
+    TWClient()

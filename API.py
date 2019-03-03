@@ -1,9 +1,9 @@
 import simplejson as json
+import pickle
 import logging
 
 __all__ = ['TW_ACTIONS', 'TWRequest']
 
-DELIMETER = '\n'
 
 class TW_ACTIONS: # действия для TW_UPDATE
     LOCATE = 0
@@ -70,7 +70,6 @@ class TWRequest: # шаблоны общения клиента и сервер�
     """
     def __init__(self, sock):
         self.logger = logging.getLogger(__name__)
-        self.__storage = []
         self.sock = sock
 
 
@@ -115,21 +114,19 @@ class TWRequest: # шаблоны общения клиента и сервер�
             uid = -1
         data = method(uid=uid, **kwargs) # в каждый реквест зашивается uid отправителя (кроме запроса на инициализацию)
         self.logger.debug('SEND: {}'.format(data))
-        self.sock.send((json.dumps(data)+DELIMETER).encode('utf-8'))
+        data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+        self.logger.debug(data)
+        self.sock.send(len(data).to_bytes(2, 'big') + data)
 
 
     def _receive(self):
-        if len(self.__storage):
-            try:
-                return json.loads(self.__storage.pop())
-            except json.JSONDecodeError:
-                return None
-        data = self.sock.recv(1024).decode('utf-8').split(DELIMETER) # замечал, что на сокет изредка приходят куски чужих данных, поэтому приходится разделять
-        data.pop()
-        if len(data) > 1:
-            self.__storage.extend(data[1:]) # прилетевшие не вовремя куски сохраняем в кэше, дабы другому клиенту не пришлось переспрашивать
+        datalen = int.from_bytes(self.sock.recv(2), 'big')
+        data = self.sock.recv(datalen)
         try:
-            self.logger.debug('RECV: {}'.format(data[0]))
-            return json.loads(data[0])
+            data = pickle.loads(data)
+            self.logger.debug('RECV: {}'.format(data))
+            return data
         except:
-            return None
+            self.logger.warn('Unpickling error:\n%s' % data)
+            
+    

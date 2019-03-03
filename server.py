@@ -51,7 +51,8 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
                     params = upd_item['params']
                     self.player.rect.center = params['coords'] # иначе обновляем позицию
                     self.player.dir = params['dir']
-                    serv.broadcast('api_update', self.player, TW_ACTIONS.LOCATE, 'get_state') # когда клиент ну очень хочет сам обновиться
+                    self.player.velocity.x, self.player.velocity.x = params['vel']
+                    #serv.broadcast('api_update', self.player, TW_ACTIONS.LOCATE, 'get_state') # когда клиент ну очень хочет сам обновиться
             elif upd_item['action'] == TW_ACTIONS.REMOVE:
                 serv.remove_object(upd_item['uid'])
                 
@@ -144,5 +145,5 @@ class TWServer(ThreadingTCPServer, GameEngine): # игровой сервер п
     
 
 ThreadingTCPServer.allow_reuse_address = True
-serv = TWServer(('0.0.0.0', 31337), TWServerHandler, nlvl=1)
+serv = TWServer(('', 31337), TWServerHandler, nlvl=1)
 Thread(target=serv.serve_forever).start()

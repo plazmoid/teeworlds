@@ -10,13 +10,12 @@ OBJECTS_POOL = utils.get_objects_pool()
 
 class TWObject(Sprite): # любой объект в игре так или иначе наследуется от этого класса
 
-    def __init__(self, spawnpoint, uid=None):
+    def __init__(self, spawnpoint, uid=None, *args, **kwargs):
         super().__init__()
-        self.uid = uid
         self.collideable = True # можно ли с объектом столкнуться
         self.pickable = False # можно ли объект подобрать
-        self._postInit() # чтоб можно было инициализировать пару своих полей и не переписывать конструктор
-        if not self.uid: # если при создании не был передан uid, то генерируем его
+        self._postInit(*args, **kwargs) # чтоб можно было инициализировать свои полей и не переписывать конструктор
+        if not 'uid' in kwargs: # если при создании не был передан uid, то генерируем его
             self.set_uid()
         self.rect = self.image.get_rect(center=spawnpoint)
         #self.rect = pygame.Rect(*self.sizes) # для корректной отрисовки объект должен содержать поля self.rect и self.image

@@ -24,7 +24,7 @@ class TWOrderedUpdates(OrderedUpdates): # массив спрайтов, в то
 
     def add_(self, uid, sprite):
         with lock:
-            self.__uids[uid] = sprite # внутри просто дублирующий словарь {TWObject().uid: TWObject()}
+            self.__uids[uid] = sprite # дублирующий словарь {TWObject.uid: TWObject}
             self.add(sprite)
 
 
