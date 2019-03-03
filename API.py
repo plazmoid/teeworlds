@@ -115,7 +115,6 @@ class TWRequest: # шаблоны общения клиента и сервер�
         data = method(uid=uid, **kwargs) # в каждый реквест зашивается uid отправителя (кроме запроса на инициализацию)
         self.logger.debug('SEND: {}'.format(data))
         data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
-        self.logger.debug(data)
         self.sock.send(len(data).to_bytes(2, 'big') + data)
 
 
@@ -127,6 +126,6 @@ class TWRequest: # шаблоны общения клиента и сервер�
             self.logger.debug('RECV: {}'.format(data))
             return data
         except:
-            self.logger.warn('Unpickling error:\n%s' % data)
+            return None
             
     

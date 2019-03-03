@@ -10,15 +10,16 @@ OBJECTS_POOL = utils.get_objects_pool()
 
 class TWObject(Sprite): # любой объект в игре так или иначе наследуется от этого класса
 
-    def __init__(self, spawnpoint, uid=None, *args, **kwargs):
+    def __init__(self, spawnpoint, *args, **kwargs):
         super().__init__()
         self.collideable = True # можно ли с объектом столкнуться
         self.pickable = False # можно ли объект подобрать
         self._postInit(*args, **kwargs) # чтоб можно было инициализировать свои полей и не переписывать конструктор
-        if not 'uid' in kwargs: # если при создании не был передан uid, то генерируем его
+        if 'uid' not in kwargs: # если при создании не был передан uid, то генерируем его
             self.set_uid()
-        self.rect = self.image.get_rect(center=spawnpoint)
-        #self.rect = pygame.Rect(*self.sizes) # для корректной отрисовки объект должен содержать поля self.rect и self.image
+        else:
+            self.uid = kwargs['uid']
+        self.rect = self.image.get_rect(center=spawnpoint) # для корректной отрисовки объект должен содержать поля self.rect и self.image
         self.orig_image = self.image
         OBJECTS_POOL.add_(self.uid, self) # объект при создании автоматически добавляется в глобальный массив
 
@@ -48,7 +49,7 @@ class TWObject(Sprite): # любой объект в игре так или ин
     def modifier(self, obj): # для джамппада, скорей всего в мусор
         pass
     
-    def _postInit(self):
+    def _postInit(self, *args, **kwargs):
         pass
     
     def drawings(self, surface): # дорисосываем что-нибудь поверх всего игрового поля
@@ -57,12 +58,22 @@ class TWObject(Sprite): # любой объект в игре так или ин
     
 class Pickable(TWObject):
     
-    def _postInit(self):
+    def _postInit(self, *args, **kwargs):
         self.pickable = True
+        self.picked = False # для однократного сообщения серверу о взятии предмета
         self.collideable = False
+    
+    
+    def picked_event(self, entity):
+        if not entity.client:
+            if not self.picked:
+                self.picked_by(entity)
+            self.picked = True
+    
     
     def picked_by(self, entity): # поднимаемое не может быть не поднято
         raise NotImplementedError
+    
     
     def update(self):
         pass

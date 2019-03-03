@@ -36,7 +36,7 @@ class JumperBlock(DefaultBlock): # зачем
 class Player(abstract.TWObject): # даже игрок наследуется от TWObject, что позволяет ему иметь свой uid и упрощать клиент-серверное общение
         
         
-    def _postInit(self, client=False):
+    def _postInit(self, client=False, *args, **kwargs):
         self.client = client # является ли игрок нами
         self.image = pygame.image.load("img/gg.png")
         self.velocity = pmath.Vector2(0, 0) # скорость представляем в виде вектора для удобства
@@ -52,7 +52,6 @@ class Player(abstract.TWObject): # даже игрок наследуется о
         state = super().get_state()
         state['dir'] = self.dir
         state['lifes'] = self.lifes
-        state['vel'] = (self.velocity.x, self.velocity.x)
         return state
         
 
@@ -75,7 +74,7 @@ class Player(abstract.TWObject): # даже игрок наследуется о
                     self.collide(obj)
                     obj.modifier(self)
                 if obj.pickable:
-                    obj.picked_by(self)
+                    obj.picked_event(self)
         
         if not self.onGround:
             self.velocity.y += GRAVITY # гравитацией снижаем высоту прыга
@@ -144,20 +143,20 @@ class Player(abstract.TWObject): # даже игрок наследуется о
 
 class Heart(abstract.Pickable): # подбираемое сердечко, восстанавливает одну хпшчку
     
-    def _postInit(self):
+    def _postInit(self, *args, **kwargs):
         super()._postInit()
         self.image = picloader.get('heart_loot').pic
         
 
     def picked_by(self, entity):
-        if entity.lifes <= MAX_LIFES and entity.client:
+        if entity.lifes <= MAX_LIFES:
             entity.lifes += 1
         pygame.event.post(pygame.event.Event(E_PICKED, author=entity, target=self))
         
     
 class GrapplingHook(abstract.Weapon):
     
-    def _postInit(self):
+    def _postInit(self, *args, **kwargs):
         self.image = picloader.get('hook').pic
         
         

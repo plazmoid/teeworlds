@@ -41,6 +41,10 @@ class TWOrderedUpdates(OrderedUpdates): # массив спрайтов, в то
         return self.__uids.get(uid, None)
     
     
+    def __repr__(self):
+        return str(self.__uids)
+    
+    
     def custom_draw(self, surface): # каждому объекту позволено оставить свой след на холсте
         for sprite in self:
             sprite.drawings(surface)

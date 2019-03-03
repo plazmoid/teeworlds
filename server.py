@@ -49,9 +49,8 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
             if upd_item['action'] == TW_ACTIONS.LOCATE:
                 if upd_item['uid'] == self.player.uid:
                     params = upd_item['params']
-                    self.player.rect.center = params['coords'] # иначе обновляем позицию
+                    #self.player.rect.center = params['coords'] # иначе обновляем позицию
                     self.player.dir = params['dir']
-                    self.player.velocity.x, self.player.velocity.x = params['vel']
                     #serv.broadcast('api_update', self.player, TW_ACTIONS.LOCATE, 'get_state') # когда клиент ну очень хочет сам обновиться
             elif upd_item['action'] == TW_ACTIONS.REMOVE:
                 serv.remove_object(upd_item['uid'])

@@ -7,7 +7,7 @@ import re
 import logging
 
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 class GameEngine(Thread): # здесь крутится игровой цикл на сервере и клиенте
     
@@ -36,9 +36,9 @@ class GameEngine(Thread): # здесь крутится игровой цикл 
     
     # спавн игровых объектов с учётом того, что 1 единица на координатной сетке = 1 кубик (размеры прописаны в конфиге)
     @staticmethod
-    def spawn(obj, coords, uid=None, *args, **kwargs): 
+    def spawn(obj, coords, *args, **kwargs): 
         x, y, *sizes = coords
-        return obj([x*PLATFORM_SIZE, y*PLATFORM_SIZE] + sizes, uid=uid, *args, **kwargs)
+        return obj([x*PLATFORM_SIZE, y*PLATFORM_SIZE] + sizes, *args, **kwargs)
             
 
 class LevelBuilder: # парсер уровней

@@ -83,12 +83,14 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
                         params = upd_item['params']
                         if not OBJECTS_POOL[uid]: # если пытаемся обновить местоположение не существующего на клиенте объекта, то создаём его
                             GameEngine.spawn(eval(f"real.{params['name']}"), params['coords'], uid=uid) # впервые в жизни пригодился eval
-                            #GameEngine.logger.info(f'Spawned {ob}\n{ob.uid}\n{uid}')
                         else:
                             obj = OBJECTS_POOL[uid]
                             obj.rect.center = params['coords'] # иначе обновляем позицию
-                            if params['name'] == 'Player' and uid != self.player.uid: # и направления оружия у всех, кроме самих себя
-                                obj.dir = params['dir']
+                            if params['name'] == 'Player':
+                                if uid != self.player.uid: # и направления оружия у всех, кроме самих себя
+                                    obj.dir = params['dir']
+                                else:
+                                    obj.lifes = params['lifes']
                     elif upd_item['action'] == TW_ACTIONS.REMOVE:
                         OBJECTS_POOL.remove_(uid)
             elif data['method'] == 'CLOSE':
