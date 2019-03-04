@@ -2,7 +2,7 @@
 
 from pygame.sprite import Sprite
 from random import randint
-from configs import PLATFORM_SIZE
+from configs import E_PICKED
 import pygame
 import utils
 
@@ -65,10 +65,12 @@ class Pickable(TWObject):
     
     
     def picked_event(self, entity):
-        if not entity.client:
+        if entity.client: # если являемся клиентом, то
+            pygame.event.post(pygame.event.Event(E_PICKED, author=entity, target=self))
+        else:
             if not self.picked:
                 self.picked_by(entity)
-            self.picked = True
+                self.picked = True
     
     
     def picked_by(self, entity): # поднимаемое не может быть не поднято

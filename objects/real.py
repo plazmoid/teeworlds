@@ -1,7 +1,7 @@
 # Здесь собраны все реальные объекты, которые есть в игре. Их можно заспавнить и уничтожить.
 
 from objects import abstract
-from configs import PLAYER_SIZE, JUMP_SPEED, GRAVITY, FRICTION, SPEED, PLATFORM_SIZE, E_PICKED, E_REPOS, MAX_LIFES
+from configs import PLAYER_SIZE, JUMP_SPEED, GRAVITY, FRICTION, SPEED, PLATFORM_SIZE, MAX_LIFES
 from pygame import math as pmath
 import pygame
 import utils
@@ -86,8 +86,6 @@ class Player(abstract.TWObject): # даже игрок наследуется о
                 self.velocity.x -= FRICTION
             elif self.velocity.x < 0:
                 self.velocity.x += FRICTION
-        #if self.rect.center != self.old_rect:
-        #    pygame.event.post(pygame.event.Event(E_REPOS))    
                 
 
     def collide(self, block):
@@ -151,7 +149,6 @@ class Heart(abstract.Pickable): # подбираемое сердечко, во�
     def picked_by(self, entity):
         if entity.lifes <= MAX_LIFES:
             entity.lifes += 1
-        pygame.event.post(pygame.event.Event(E_PICKED, author=entity, target=self))
         
     
 class GrapplingHook(abstract.Weapon):

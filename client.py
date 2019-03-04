@@ -43,10 +43,11 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
     
     class WatchDog(Thread): # простой вачдог, вырубающий клиент игры при потере соединения с сервером
         
+        __WD_TIMER_RST = 5
+        
         def __init__(self, outer):
             super().__init__()
             self.outer = outer
-            self.__WD_TIMER_RST = 5
             self.__wd_timer = self.__WD_TIMER_RST
             self.start()
             
@@ -99,10 +100,8 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
             
     def events_handler(self):
         e = pygame.event.poll()
-        if e.type == pygame.KEYDOWN or e.type == pygame.KEYUP: self.api_key(e.key, e.type) # нажали или отжали клавишу - рапортуем серверу
-            
-        #if e.type == E_REPOS: # попытка запилить отправку обновлений при изменении позиции ГГ
-        #    self.api_update(self.player, TW_ACTIONS.LOCATE)
+        if e.type == pygame.KEYDOWN or e.type == pygame.KEYUP: self.api_key(e.key, e.type) # нажали или отжали клавишу - сообщаем серверу
+    
         
         if e.type == E_PICKED: #TODO: допилить сердечки
             self.api_update(e.target, TW_ACTIONS.REMOVE)

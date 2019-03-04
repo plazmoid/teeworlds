@@ -80,24 +80,5 @@ class LevelBuilder: # парсер уровней
                 self.blocks[block](bpoint) # статические объекты уровня создаются туть
             by += 1
             
-'''
-class Camera():
-    def __init__(self, w, h):
-        self.camera = Rect(0, 0, w, h)
-    
-    def apply(self, target):
-        return target.rect.move(self.camera.topleft)
-
-    def update(self, target):
-        l, t, _, _ = target
-        _, _, w, h = self.camera
-        l, t = -l+WIN_WIDTH / 2, -t+WIN_HEIGHT / 2
-    
-        l = min(0, l)
-        l = max(-(self.camera.width-WIN_WIDTH), l)
-        t = max(-(self.camera.height-WIN_HEIGHT), t)
-        t = min(0, t)
-
-        return Rect(l, t, w, h)       
-    
-'''
+            
+            
