@@ -1,13 +1,13 @@
 from pygame import USEREVENT
 
 # screen params
-SCR_W_COEFF = 30
-SCR_H_COEFF = 16
+SCR_W_COEFF = 50
+SCR_H_COEFF = 30
 PLATFORM_SIZE = 30
 SCR_SIZE = (PLATFORM_SIZE*SCR_W_COEFF, PLATFORM_SIZE*SCR_H_COEFF)
 
 # connection params 
-SERV_IP = '185.229.225.92'
+SERV_IP = '127.0.0.1' #'185.229.225.92'
 SERV_PORT = 31337
 
 # game params

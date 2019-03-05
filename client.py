@@ -6,11 +6,11 @@ from configs import SCR_SIZE, SERV_IP, SERV_PORT, E_PICKED
 from objects import real
 import socket
 import pygame
-import utils
+import datatypes
 
 
 SERVER_ADDR = (SERV_IP, SERV_PORT)
-OBJECTS_POOL = utils.get_objects_pool()
+OBJECTS_POOL = datatypes.get_objects_pool()
 
 class TWClient(TWRequest, GameEngine): # клиент тоже наследует игровой движок, но уже с немного другими операциями в игровом цикле
     
@@ -29,7 +29,7 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
                     self.screen = pygame.Surface(SCR_SIZE)
                     GameEngine.__init__(self, data['nlvl']) # и игровой цикл
                     self.player = GameEngine.spawn(real.Player, [0, 0], uid=data['uid'], client=True)
-                    #self.player.weaponize('hook') # вооружаем свежесозданного игрока гарпуном
+                    self.player.weaponize(real.Pistol(owner=self.player)) # вооружаем свежесозданного игрока
                     break
             except socket.error as err:
                 GameEngine.logger.error(str(err))
@@ -43,7 +43,7 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
     
     class WatchDog(Thread): # простой вачдог, вырубающий клиент игры при потере соединения с сервером
         
-        __WD_TIMER_RST = 5
+        __WD_TIMER_RST = 3
         
         def __init__(self, outer):
             super().__init__()
@@ -69,7 +69,7 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
                     
         def reset(self): # не даём псине отключить нас, когда всё работает
             self.__wd_timer = self.__WD_TIMER_RST
-                    
+
         
     def __update_daemon(self): # принимаем обновления от сервера (тоже в отдельном потоке)
         while self.loop:
@@ -106,8 +106,14 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
         if e.type == E_PICKED: #TODO: допилить сердечки
             self.api_update(e.target, TW_ACTIONS.REMOVE)
             
+            
         if e.type == pygame.QUIT: # при закрытии клиента завершаем сразу же все потоки
             self.loop = False
+            
+        
+        if e.type == pygame.MOUSEBUTTONDOWN: # выстрел
+            self.player.active.shoot()
+            
             
         if e.type == pygame.KEYDOWN:
             if e.key == pygame.K_LEFT or e.key == pygame.K_a:

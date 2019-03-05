@@ -7,12 +7,12 @@ from objects import real
 from configs import E_PICKED
 from random import randint
 import pygame
-import utils
+import datatypes
 
 
 
 CLIENTS = {} # {наследник TWObject: сущность TWServerHandler}
-OBJECTS_POOL = utils.get_objects_pool()
+OBJECTS_POOL = datatypes.get_objects_pool()
 lock = Lock()
 
 class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик одного соединения, крутится в отдельном потоке
@@ -22,7 +22,7 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
         self.loop = True
         while self.loop:
             try:
-                data = self._receive() # не отказываем себе в удовольствии понять полезность блокирующих сокетов
+                data = self._receive()
             except ConnectionResetError:
                 try:
                     self.remove_player() # игрок отпал - вырубаем его на сервере с последующей рассылкой
@@ -51,6 +51,7 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
                     params = upd_item['params']
                     #self.player.rect.center = params['coords'] # иначе обновляем позицию
                     self.player.dir = params['dir']
+                    self.player.active = params['wpn']
                     #serv.broadcast('api_update', self.player, TW_ACTIONS.LOCATE, 'get_state') # когда клиент ну очень хочет сам обновиться
             elif upd_item['action'] == TW_ACTIONS.REMOVE:
                 serv.remove_object(upd_item['uid'])
@@ -95,7 +96,7 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
     def remove_player(self):
         with lock: # потокобезопасно удаляем игрока из всех таблиц
             del CLIENTS[self.player]
-        OBJECTS_POOL.remove_(self.player) # а OBJECTS_POOL безопасен уже внутри реализации (utils.py)
+        OBJECTS_POOL.remove_(self.player) # а OBJECTS_POOL безопасен уже внутри реализации
         self.loop = False # завершаем для этого игрока игровой цикл
         serv.broadcast('api_update', self.player, TW_ACTIONS.REMOVE) # и говорим всем, что он отвалился
         GameEngine.logger.info(f'Player #{self.player.uid} disconnected')
@@ -139,8 +140,8 @@ class TWServer(ThreadingTCPServer, GameEngine): # игровой сервер п
         
     def __temp_spawner(self):
         while True:
-            GameEngine.spawn(real.Heart, [randint(0, 25), randint(0, 25)])
-            sleep(randint(5, 8))
+            GameEngine.spawn(real.Heart, [randint(0, 25), randint(0, 20)])
+            sleep(randint(8, 15))
     
 
 ThreadingTCPServer.allow_reuse_address = True

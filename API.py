@@ -1,4 +1,3 @@
-import simplejson as json
 import pickle
 import logging
 
