@@ -1,7 +1,7 @@
 # Здесь собраны все реальные объекты, которые есть в игре. Их можно заспавнить и уничтожить.
 
 from objects import abstract
-from configs import PLAYER_SIZE, JUMP_SPEED, GRAVITY, FRICTION, SPEED, PLATFORM_SIZE, MAX_LIFES
+from configs import JUMP_SPEED, GRAVITY, FRICTION, SPEED, PLATFORM_SIZE, MAX_LIFES
 from pygame import math as pmath
 import pygame
 import utils
@@ -39,9 +39,11 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
     def _init_rect(self, *args, **kwargs):
         self.image = pygame.image.load("img/gg.png")
         
+        
     def _postInit(self, client=False, *args, **kwargs):
+        self.updateable = True # любой игрок должен обновляться постоянно
         self.client = client # является ли игрок нами
-        self.active = None # текущее оружие в руках игрока
+        self.active = None # текущее оружие в руках
         self.velocity = pmath.Vector2(0, 0) # скорость представляем в виде вектора для удобства
         self.keydir = pmath.Vector2(0, 0) # как и нажатые клавиши
         self.dir = (0, 0)
@@ -49,14 +51,32 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
         self.collideable = False # игроки не сталкиваются
         self.lifes = 2 
         self.armor = 0
-        self.weapons = [] # здесь валяется всё оружие игрока
-
+        self.weapons = dict(map(lambda x: (x.__name__, x(owner=self, hidden=True)), # здесь валяется всё оружие игрока
+                [Hammer, Shotgun, GrenadeLauncher, Ninja, Laser]))
+        self.wpnswitcher = {getattr(pygame, 'K_%s' % (i+1)):v for i, v in enumerate(self.weapons)}
+        self.switch_weapon('Hammer')
+        
+    
+    def switch_weapon(self, key):
+        try:
+            if type(key) == str:
+                wname = key
+            else:
+                wname = self.wpnswitcher[key]
+            next_wpn = self.weapons[wname]
+        except KeyError:
+            return
+        if self.active:
+            self.active.hide(True)
+        self.active = next_wpn
+        self.active.hide(False)
+    
 
     def get_state(self):
         state = super().get_state()
         state['dir'] = self.dir
         state['lifes'] = self.lifes
-        state['wpn'] = self.active
+        state['wpn'] = self.active._name
         return state
         
 
@@ -125,20 +145,26 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
 #             surface.blit(textsurface,(0,60))
             heart_full = pics.get('heart_full')# рисуем шкалу здоровья
             heart_empty = pics.get('heart_empty')
-            h_draw_coeff = 30
-            for h in range(MAX_LIFES):
-                h_img = heart_full if h+1 <= self.lifes else heart_empty
-                surface.blit(h_img, (h*h_draw_coeff, 5))
+            draw_coeff = 30
+            for i in range(MAX_LIFES):
+                h_img = heart_full if i+1 <= self.lifes else heart_empty
+                surface.blit(h_img, (i*draw_coeff, 5))
+            
+            if self.active and self.active.model.proj:
+                for i in range(self.active.ammo):
+                    surface.blit(self.active.model.proj, (i*draw_coeff, 30))
         
             
-    def weaponize(self, weapon):
-        if self.active == None:
-            self.active = weapon
-        self.weapons.append(weapon)
+    #def weaponize(self, weapon):
+    #    if self.active == None:
+    #        self.active = weapon
+    #    self.weapons.append(weapon)
         
         
     def hit(self, obj):
         self.lifes -= obj.model.dmg
+        if self.lifes < 0:
+            self.lifes = 0
 
 
 class Heart(abstract.Pickable): # подбираемое сердечко, восстанавливает одну хпшчку
@@ -154,6 +180,43 @@ class Heart(abstract.Pickable): # подбираемое сердечко, во�
         
     def update(self):
         pass
+
+    
+
+class Projectile(abstract.TWObject):
+    
+    def _init_rect(self, *args, **kwargs):
+        self.model = kwargs['model']
+        self.image = self.model.proj
+        if not self.image:
+            print('ERROR IMAGE INIT IN %s', kwargs['model'])
+        
+        
+    def _postInit(self, *args, **kwargs):
+        self.collideable = False
+        self.updateable = True
+        self.velocity = pmath.Vector2(0, 0)
+        angle = utils.u_degrees(-utils.angleTo(self.rect.center, kwargs['dir']))
+        self.image = pygame.transform.rotate(self.image, angle)
+        self.image = pygame.transform.flip(self.image, False, True)
+        self.velocity.from_polar((self.model.speed, angle))
+    
+        
+    def update(self):
+        self.velocity.y += GRAVITY/self.model.flatness
+        self.rect.x += self.velocity.x
+        self.rect.y += self.velocity.y
+        for obj in OBJECTS_POOL: # проверки на столкновения с объектами на уровне
+            if self != obj and pygame.sprite.collide_rect(self, obj):
+                if obj._name == 'Player':
+                    obj.hit(self)
+                if obj.collideable:
+                    self.kaboom()
+                    
+                    
+    def kaboom(self):
+        self._destroy()
+
     
     
 class GrapplingHook(abstract.Weapon):
@@ -162,26 +225,62 @@ class GrapplingHook(abstract.Weapon):
         self.image = pics.get('hook')
         
         
-    def shoot(self):
+    def shooter(self):
         pass
 
 
-class Hammer(abstract.Weapon):pass
+class Hammer(abstract.Weapon):
+    
+    def shooter(self):
+        for obj in OBJECTS_POOL:
+            if self != obj and pygame.sprite.collide_rect(self, obj):
+                if obj._name == 'Player' and obj != self.owner:
+                    obj.hit(self)            
         
         
-class Pistol(abstract.Weapon):pass
+class Pistol(abstract.Weapon):
+    
+    def shooter(self):
+        if self.ammo > 0:
+            p = Projectile(self.owner.rect.center, model=self.model, dir=self.owner.dir)    
+            self.ammo -= 1
+            return p.uid
+         
         
+class Shotgun(abstract.Weapon):
+    
+    def shooter(self):
+        if self.ammo > 0:
+            p = Projectile(self.owner.rect.center, model=self.model, dir=self.owner.dir)
+            self.ammo -= 1
+            return p.uid
         
-class Shotgun(abstract.Weapon):pass
-        
-        
-class GrenadeLauncher(abstract.Weapon):pass
-        
-        
-class Ninja(abstract.Weapon):pass
+
+class GrenadeLauncher(abstract.Weapon):
+    
+    def shooter(self):
+        if self.ammo > 0:
+            p = Projectile(self.owner.rect.center, model=self.model, dir=self.owner.dir)
+            self.ammo -= 1
+            return p.uid
 
         
-class Laser(abstract.Weapon):pass
+class Ninja(abstract.Weapon):
+    
+    def shooter(self):
+        for obj in OBJECTS_POOL:
+            if self != obj and pygame.sprite.collide_rect(self, obj):
+                if obj._name == 'Player' and obj != self.owner:
+                    obj.hit(self)            
+
+        
+class Laser(abstract.Weapon):
+    
+    def shooter(self):
+        if self.ammo > 0:
+            p = Projectile(self.owner.rect.center, model=self.model, dir=self.owner.dir)
+            self.ammo -= 1
+            return p.uid
         
         
         

@@ -17,7 +17,7 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
     def __init__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
         self.sock.setblocking(True)
-        TWRequest.__init__(self, self.sock)
+        TWRequest.__init__(self, self.sock, True)
         GameEngine.logger.info('Connecting to ' + str(SERVER_ADDR))
         while True:
             try:
@@ -29,7 +29,6 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
                     self.screen = pygame.Surface(SCR_SIZE)
                     GameEngine.__init__(self, data['nlvl']) # и игровой цикл
                     self.player = GameEngine.spawn(real.Player, [0, 0], uid=data['uid'], client=True)
-                    self.player.weaponize(real.Pistol(owner=self.player)) # вооружаем свежесозданного игрока
                     break
             except socket.error as err:
                 GameEngine.logger.error(str(err))
@@ -94,25 +93,32 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
                                     obj.lifes = params['lifes']
                     elif upd_item['action'] == TW_ACTIONS.REMOVE:
                         OBJECTS_POOL.remove_(uid)
+                    elif upd_item['action'] == TW_ACTIONS.SWITCH:
+                        if uid != self.player.uid:
+                            OBJECTS_POOL[uid].switch_weapon(upd_item['params']['wpn'])
             elif data['method'] == 'CLOSE':
                 self.loop = False
             
             
     def events_handler(self):
         e = pygame.event.poll()
-        if e.type == pygame.KEYDOWN or e.type == pygame.KEYUP: self.api_key(e.key, e.type) # нажали или отжали клавишу - сообщаем серверу
+            
+        
+        if e.type == pygame.MOUSEBUTTONDOWN: # выстрел
+            self.player.active.shoot()
+            self.api_key(e.type)
+            
+        
+        if e.type == pygame.KEYDOWN or e.type == pygame.KEYUP:
+            self.api_key(e.type, e.key) # нажали или отжали клавишу - сообщаем серверу
     
         
-        if e.type == E_PICKED: #TODO: допилить сердечки
+        if e.type == E_PICKED:
             self.api_update(e.target, TW_ACTIONS.REMOVE)
             
             
         if e.type == pygame.QUIT: # при закрытии клиента завершаем сразу же все потоки
             self.loop = False
-            
-        
-        if e.type == pygame.MOUSEBUTTONDOWN: # выстрел
-            self.player.active.shoot()
             
             
         if e.type == pygame.KEYDOWN:
@@ -124,6 +130,8 @@ class TWClient(TWRequest, GameEngine): # клиент тоже наследуе�
                 self.player.keydir.y = -1
             elif e.key == pygame.K_ESCAPE:
                 self.loop = False
+            elif pygame.K_0 <= e.key <= pygame.K_9:
+                self.player.switch_weapon(e.key)
                 
         if e.type == pygame.KEYUP:
             if e.key == pygame.K_LEFT or e.key == pygame.K_a:

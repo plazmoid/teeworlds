@@ -1,5 +1,7 @@
+from random import randint
 import pickle
 import logging
+
 
 __all__ = ['TW_ACTIONS', 'TWRequest']
 
@@ -7,9 +9,10 @@ __all__ = ['TW_ACTIONS', 'TWRequest']
 class TW_ACTIONS: # действия для TW_UPDATE
     LOCATE = 0
     REMOVE = 1
+    SWITCH = 2
 
 
-class TW_API: # нравятся jsonчики
+class TW_API:
     """
     Possible API methods
     """
@@ -67,16 +70,18 @@ class TWRequest: # шаблоны общения клиента и сервер�
     """
     Serialize data to bytes and construct/validate a request
     """
-    def __init__(self, sock):
+    def __init__(self, sock, client=False):
         self.logger = logging.getLogger(__name__)
         self.sock = sock
+        self.client = client
+        self.last_pid = None
 
 
     def api_init(self, nlvl=None): # каждый json в TW_API имеет свой метод, которым он конструируется и отправляется
         self._request(TW_API.INIT, nlvl=nlvl)
 
 
-    def api_key(self, key, keytype):
+    def api_key(self, keytype, key=None):
         self._request(TW_API.KEY, key=key, keytype=keytype)
 
 
@@ -104,7 +109,7 @@ class TWRequest: # шаблоны общения клиента и сервер�
             else: # по сущности TWObject
                 updated = [TW_API.UPD_DATA(uid=entity.uid, action=action, params=getparams(entity))]
         self._request(TW_API.UPDATE, updated=updated)
-    
+
 
     def _request(self, method, **kwargs):
         try:
@@ -112,6 +117,9 @@ class TWRequest: # шаблоны общения клиента и сервер�
         except AttributeError:
             uid = -1
         data = method(uid=uid, **kwargs) # в каждый реквест зашивается uid отправителя (кроме запроса на инициализацию)
+        if self.client:
+            self.last_pid = randint(0, 65535)
+        data['pid'] = self.last_pid
         self.logger.debug('SEND: {}'.format(data))
         data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
         self.sock.send(len(data).to_bytes(2, 'big') + data)
@@ -122,8 +130,15 @@ class TWRequest: # шаблоны общения клиента и сервер�
         data = self.sock.recv(datalen)
         try:
             data = pickle.loads(data)
-            self.logger.debug('RECV: {}'.format(data))
-            return data
+            if self.client:
+                if self.last_pid == data['pid']:
+                    self.last_pid = data['pid']
+                    self.logger.debug('RECV: {}'.format(data))
+                    return data
+            else:
+                self.last_pid = data['pid']
+                self.logger.debug('RECV: {}'.format(data))
+                return data
         except:
             return None
             

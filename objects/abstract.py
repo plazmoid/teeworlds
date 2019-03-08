@@ -1,9 +1,8 @@
 # Тут свалены абстракции, т.е. предметы, которые создавать бессмысленно, но их каркас используется наследниками
 
 from pygame.sprite import Sprite
-from pygame import math as pmath
 from random import randint
-from configs import E_PICKED, GRAVITY
+from configs import E_PICKED
 from time import time
 import pygame
 import utils
@@ -18,15 +17,16 @@ class TWObject(Sprite): # любой объект в игре так или ин
         super().__init__()
         self.collideable = True # можно ли с объектом столкнуться
         self.pickable = False # можно ли объект подобрать
+        self.updateable = False # требуется ли объекту постоянная рассылка обновлений своего состояния
         self._init_rect(*args, **kwargs)
         if 'uid' not in kwargs: # если при создании не был передан uid, то генерируем его
             self.set_uid()
         else:
             self.uid = kwargs['uid']
         self.rect = self.image.get_rect(center=spawnpoint) # для корректной отрисовки объект должен содержать поля self.rect и self.image
-        self._postInit(*args, **kwargs) # чтоб можно было инициализировать свои полей и не переписывать конструктор
-        self.orig_image = self.image
-        OBJECTS_POOL.add_(self.uid, self) # объект при создании автоматически добавляется в глобальный массив
+        self._postInit(*args, **kwargs) # чтоб можно было инициализировать свои поля и не переписывать конструктор
+        self.orig_image = self.image # нужно для вращения объекта (при вращении одной и той же картинки теряется качество)
+        OBJECTS_POOL.add_(self) # объект при создании автоматически добавляется в глобальный массив
 
             
     def set_uid(self, uid=None):
@@ -43,14 +43,15 @@ class TWObject(Sprite): # любой объект в игре так или ин
         raise NotImplementedError # каждый объект должен как-нибудь обновляться
 
     def __str__(self):
-        return '%s %s' % (self._name(), (self.rect.x, self.rect.y))
+        return '%s %s' % (self._name, (self.rect.x, self.rect.y))
 
     def get_state(self): # получаем состояние объекта для его апдейта на всех клиентах (uid передаётся автоматически)
         return {
-            'name': self._name(),
+            'name': self._name,
             'coords': self.rect.center
         }
         
+    @property
     def _name(self):
         return self.__class__.__name__
     
@@ -65,11 +66,11 @@ class TWObject(Sprite): # любой объект в игре так или ин
         pass
         
     
-    def hide(self, h, obj=None):
+    def hide(self, h):
         if h:
             OBJECTS_POOL.remove_(self) # если прячем, то надеемся, что объект ещё остался в памяти
         else:
-            OBJECTS_POOL.add_(obj.uid, obj)
+            OBJECTS_POOL.add_(self)
         
         
     def _destroy(self):
@@ -105,7 +106,7 @@ class Pickable(TWObject):
 
 class Weapon(Pickable):
 
-    def __init__(self, spawnpoint=None, *args, **kwargs):
+    def __init__(self, spawnpoint=None, *args, hidden=False, **kwargs):
         try:
             name = self.__class__.__name__
             self.model = wpns[name] # получаем конфиги оружия
@@ -117,6 +118,8 @@ class Weapon(Pickable):
             self.owner = kwargs['owner']
             super().__init__(self.owner.rect.center)
             self.pwned()
+            if hidden:
+                self.hide(True)
         else:
             super().__init__(spawnpoint, *args, **kwargs)
             self.owner = None
@@ -128,7 +131,7 @@ class Weapon(Pickable):
         self.pwned()
         entity.weaponize(self)
         self.owner = entity
-        
+
         
     def pwned(self):
         self.collideable = False
@@ -142,44 +145,17 @@ class Weapon(Pickable):
             self.image = pygame.transform.rotate(self.orig_image, degr)
             self.image = pygame.transform.flip(self.image, True, True)
             #if 90 <= degr <= 270:
-            #    self.image = pygame.transform.flip(self.image, False, True)
+            #    self.image = pygame.transform.flip(self.image, True, False)
             self.rect = self.image.get_rect(center=self.owner.rect.center) # оружие всегда торчит из центра игрока
         
         
     def shoot(self):
-        if self.model.rate < (time() - self.last_shot): 
-            Projectile(self.owner.rect.center, model=self.model)
+        if self.model.rate < (time() - self.last_shot):
             self.last_shot = time()
-    
-
-class Projectile(TWObject):
-    
-    def _init_rect(self, *args, **kwargs):
-        self.model = kwargs['model']
-        self.image = self.model.proj
+            return self.shooter()
+            
         
-        
-    def _postInit(self, *args, **kwargs):
-        self.collideable = False
-        self.velocity = pmath.Vector2(0, 0)
-        angle = utils.u_degrees(-utils.angleTo(self.rect.center, pygame.mouse.get_pos()))
-        self.image = pygame.transform.rotate(self.image, angle)
-        self.image = pygame.transform.flip(self.image, False, True)
-        self.velocity.from_polar((self.model.speed, angle))
+    def shooter(self):
+        raise NotImplementedError
     
-        
-    def update(self):
-        self.velocity.y += GRAVITY/self.model.flatness
-        self.rect.x += self.velocity.x
-        self.rect.y += self.velocity.y
-        for obj in OBJECTS_POOL: # проверки на столкновения с объектами на уровне
-            if self != obj and pygame.sprite.collide_rect(self, obj):
-                if obj._name() == 'Player': 
-                    obj.hit(self)
-                if obj.collideable:
-                    self.kaboom()
-                    
-                    
-    def kaboom(self):
-        self._destroy()
 

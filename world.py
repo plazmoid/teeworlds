@@ -1,5 +1,4 @@
 from configs import SCR_W_COEFF, PLATFORM_SIZE
-#from pygame import Rect
 from threading import Thread
 from objects import real
 import pygame
@@ -36,9 +35,9 @@ class GameEngine(Thread): # здесь крутится игровой цикл 
     
     # спавн игровых объектов с учётом того, что 1 единица на координатной сетке = 1 кубик (размеры прописаны в конфиге)
     @staticmethod
-    def spawn(obj, coords, *args, **kwargs): 
+    def spawn(TWobj, coords, *args, **kwargs): 
         x, y, *sizes = coords
-        return obj([x*PLATFORM_SIZE, y*PLATFORM_SIZE] + sizes, *args, **kwargs)
+        return TWobj([x*PLATFORM_SIZE, y*PLATFORM_SIZE] + sizes, *args, **kwargs)
             
 
 class LevelBuilder: # парсер уровней
@@ -49,6 +48,7 @@ class LevelBuilder: # парсер уровней
             '#': real.DefaultBlock,
             '!': real.JumperBlock
         }
+        self.level_map = {} # {(x, y): block}
 
     def __normalize(self, s_coord):
         s_coord = int(s_coord)

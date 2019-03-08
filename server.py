@@ -11,7 +11,7 @@ import datatypes
 
 
 
-CLIENTS = {} # {наследник TWObject: сущность TWServerHandler}
+CLIENTS = {} # {TWObject: TWServerHandler}
 OBJECTS_POOL = datatypes.get_objects_pool()
 lock = Lock()
 
@@ -49,13 +49,11 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
             if upd_item['action'] == TW_ACTIONS.LOCATE:
                 if upd_item['uid'] == self.player.uid:
                     params = upd_item['params']
-                    #self.player.rect.center = params['coords'] # иначе обновляем позицию
                     self.player.dir = params['dir']
-                    self.player.active = params['wpn']
                     #serv.broadcast('api_update', self.player, TW_ACTIONS.LOCATE, 'get_state') # когда клиент ну очень хочет сам обновиться
             elif upd_item['action'] == TW_ACTIONS.REMOVE:
                 serv.remove_object(upd_item['uid'])
-                
+
 
     def new_player(self):
         self.player = GameEngine.spawn(real.Player, [10, 2])
@@ -69,7 +67,7 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
         
     def __update_daemon(self): # собираем обновления от всех других игроков
         while self.loop:
-            self.api_update(list(CLIENTS) + serv.get_dynamic_objects(), TW_ACTIONS.LOCATE, 'get_state')
+            self.api_update(serv.get_updateable_objects(), TW_ACTIONS.LOCATE, 'get_state')
             sleep(0.03)
 
 
@@ -83,6 +81,9 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
                 self.player.keydir.x = 1
             elif key == pygame.K_UP or key == pygame.K_w:
                 self.player.keydir.y = -1
+            elif pygame.K_0 <= key <= pygame.K_9:
+                self.player.switch_weapon(key)
+                serv.broadcast('api_update', self.player, TW_ACTIONS.SWITCH, 'get_state')
      
         elif ktype == pygame.KEYUP:
             if key == pygame.K_LEFT or key == pygame.K_a:
@@ -91,6 +92,9 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
                 self.player.keydir.x = 0
             elif key == pygame.K_UP or key == pygame.K_w:
                 self.player.keydir.y = 0
+        
+        elif ktype == pygame.MOUSEBUTTONDOWN:
+            self.player.active.shoot()
         
 
     def remove_player(self):
@@ -101,7 +105,6 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
         serv.broadcast('api_update', self.player, TW_ACTIONS.REMOVE) # и говорим всем, что он отвалился
         GameEngine.logger.info(f'Player #{self.player.uid} disconnected')
         
-
 
 
 class TWServer(ThreadingTCPServer, GameEngine): # игровой сервер помимо ожидания подключений крутит и игровой цикл
@@ -124,8 +127,8 @@ class TWServer(ThreadingTCPServer, GameEngine): # игровой сервер п
             self.remove_object(e.target)
         
     
-    def get_dynamic_objects(self): # получить все динамические (созданные через GameEngine.spawn) объекты для их обновления и рассылки обновлений всем клиентам
-        return list(filter(lambda obj: obj.pickable, OBJECTS_POOL))
+    def get_updateable_objects(self): # получить все обновляемые объекты
+        return list(filter(lambda obj: obj.updateable, OBJECTS_POOL))
         
         
     def remove_object(self, obj): # удаление теоретически любого объекта с дальнейшей рассылкой об удалении

@@ -13,9 +13,9 @@ class TWOrderedUpdates(OrderedUpdates): # массив спрайтов, в то
         super().__init__()
 
 
-    def add_(self, uid, sprite):
+    def add_(self, sprite):
         with lock:
-            self.__uids[uid] = sprite # дублирующий словарь {TWObject.uid: TWObject}
+            self.__uids[sprite.uid] = sprite # дублирующий словарь {TWObject.uid: TWObject}
             self.add(sprite)
 
 
@@ -45,7 +45,7 @@ def get_objects_pool():
 
 cached_pic = None
 last_path = None
-scale_coeff = 0.36
+scale_coeff = 0.39
 
 
 def cutter(dims, path='img/game.png'):
@@ -89,82 +89,85 @@ pics['laser_aim'] = cutter((3, 387, 65, 65))
 pics['laser_proj'] = cutter((335, 392, 35, 52))
 
 
-WpnModel = namedtuple('TTX', [
+class WpnModel(namedtuple('WpnModel', [
     'img', # картинка оружия
     'aim', # картинка прицела
     'proj', # картинка снаряда
+    'rot', # угол поворота оружия при его отрисовке (если None, то поворачивается вслед за мышкой)
     'dmg', # урон от снаряда, измеряется в хп (сердце/броня)
     'splash_r', # радиус сплеша (в пикселях)
     'flatness', # настильность (0 - 1, насколько снаряд не подвержен гравитации)
     'speed', # скорость полёта снаряда
-    'melee', # урон в ближнем бою
     'rate', # скорострельность (выстрел раз в rate секунд)
-], defaults=('', '', '', 0, 0, 0, 0, 0))
+], defaults=(None, None, None, None, 0, 0, 0, 0))):
 
 
-    
-wpns = {}
+    def picturize(self):
+        fields = {}
+        img_name = self.img
+        fields['img'] = pics.get(self.img, None)
+        for fld in ['aim', 'proj']: # если нет полей aim, proj, то устанавливаем их при наличии изображения
+            fields[fld] = pics.get('%s_%s' % (img_name, fld), None)
+        return self._replace(**fields)
 
-wpns['GrapplingHook'] = WpnModel(
-    img=pics['hook'],
-    rate=0.2
-)
 
-wpns['Hammer'] = WpnModel(
-    img=pics['hammer'],
-    aim=pics['aim_default'],
-    melee=6,
-    rate=0.3
-)
+wpns = {
+    'GrapplingHook': { 
+        'img': 'hook',
+        'rate': 0.2
+    },
 
-wpns['Pistol'] = WpnModel(
-    img=pics['pistol'],
-    aim=pics['pistol_aim'],
-    proj=pics['pistol_proj'],
-    dmg=2,
-    flatness=1,
-    speed=40,
-    rate=0.2
-)
+    'Hammer': {
+        'img': 'hammer',
+        'aim': 'aim_default',
+        'dmg': 6,
+        'rate': 0.3
+    },
 
-wpns['Shotgun'] = WpnModel(
-    img=pics['rifle'],
-    aim=pics['rifle_aim'],
-    proj=pics['rifle_proj'],
-    dmg=4,
-    flatness=1,
-    speed=40,
-    rate=0.4
-)
+    'Pistol': {
+        'img': 'pistol',
+        'dmg': 2,
+        'flatness': 1,
+        'speed': 50,
+        'rate': 0.2
+    },
 
-wpns['GrenadeLauncher'] = WpnModel(
-    img=pics['grenade_launcher'],
-    aim=pics['grenade_launcher_aim'],
-    proj=pics['grenade_launcher_proj'],
-    dmg=7,
-    splash_r=5,
-    flatness=0.5,
-    speed=25,
-    rate=1
-)
+    'Shotgun': {
+        'img': 'rifle',
+        'dmg': 4,
+        'flatness': 1,
+        'speed': 40,
+        'rate': 0.4
+    },
 
-wpns['Ninja'] = WpnModel(
-    img=pics['ninja'],
-    aim=pics['ninja_aim'],
-    melee=8,
-    rate=1
-)
+    'GrenadeLauncher': {
+        'img': 'grenade_launcher',
+        'dmg': 7,
+        'splash_r': 5,
+        'flatness': 0.5,
+        'speed': 25,
+        'rate': 0.7
+    },
 
-wpns['Laser'] = WpnModel(
-    img=pics['laser'],
-    aim=pics['laser_aim'],
-    proj=pics['laser_proj'], # NOPE
-    dmg=8,
-    flatness=1,
-    speed=999,
-    rate=2
-)
+    'Ninja': {
+        'img': 'ninja',
+        'dmg': 8,
+        'rate': 1
+    },
 
+    'Laser': {
+        'img': 'laser',
+        'aim': 'laser_aim',
+        'proj': 'laser_proj', #TODO: прикрутть эффект лазера
+        'dmg': 8,
+        'flatness': 1,
+        'speed': 999,
+        'rate': 2
+    }
+}
+
+for w in wpns:
+    wpns[w] = WpnModel(**wpns[w]).picturize()
 
 
 
