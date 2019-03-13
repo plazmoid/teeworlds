@@ -2,7 +2,8 @@ from API import *
 from time import sleep
 from world import TWEngine
 from threading import Thread
-from configs import SCR_SIZE, SERV_IP, SERV_PORT, E_PICKED, MAX_LIFES, E_KILLED
+from configs import SCR_SIZE, SERV_IP, SERV_PORT, E_PICKED, MAX_LIFES, E_KILLED, SCR_H_COEFF,\
+    PLATFORM_SIZE
 from objects import real
 from datatypes import OBJECTS_POOL, pics
 import socket
@@ -42,7 +43,7 @@ class TWClient(TWRequest, TWEngine): # клиент тоже наследует 
 
     def __update_daemon(self): # принимаем обновления от сервера (тоже в отдельном потоке)
         while self.loop:
-            self.api_update(self.player, TW_ACTIONS.LOCATE, 'get_state', upd_pid=False) # TODO: для передачи направления взгляда, поправить
+            self.api_update(self.player, TW_ACTIONS.LOCATE, 'get_state', upd_pid=False)
             data = self._receive()
             if not data:
                 continue
@@ -55,9 +56,10 @@ class TWClient(TWRequest, TWEngine): # клиент тоже наследует 
                     if upd_item['action'] == TW_ACTIONS.LOCATE:
                         if not obj: # если пытаемся обновить местоположение не существующего на клиенте объекта, то создаём его
                             try:
+                                #print('Awaiting for spawn:', attrib)
                                 self.spawn(eval(f"real.{attrib['name']}"), uid=uid, **attrib) # впервые в жизни пригодился eval
+                                #print('Spawned:', p)
                             except KeyError as err:
-                                print(obj)
                                 TWEngine.logger.warning('Spawn error %s in %s' % (err, upd_item))
                         else:
                             obj.rect.center = attrib['coords'] # иначе обновляем позицию
@@ -147,6 +149,13 @@ class TWClient(TWRequest, TWEngine): # клиент тоже наследует 
             surface.blit(scoreboard, (SCR_SIZE[0]-180, i*20+10))
             surface.blit(player_head, (player.rect.x-20, player.rect.y-30))
 
+        '''for i in range(1, SCR_H_COEFF):
+            fnt = sb_font.render(str(i), False, (0, 0, 0))
+            surface.blit(fnt, (SCR_SIZE[0]-40, (i-1)*PLATFORM_SIZE-10))
+            surface.blit(fnt, (300, (i-1)*PLATFORM_SIZE-10))
+            surface.blit(fnt, (600, (i-1)*PLATFORM_SIZE-10))
+            surface.blit(fnt, (10, (i-1)*PLATFORM_SIZE-10))'''
+            
         if not hasattr(self, 'player'):
             return
         heart_full = pics.get('heart_full')# рисуем шкалу здоровья
