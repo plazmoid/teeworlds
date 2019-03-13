@@ -10,30 +10,16 @@ import utils
 
 
 class DefaultBlock(abstract.TWObject): # блок уровня
-
-    def update(self):
-        pass
     
     def _init_rect(self, *args, **kwargs):
         self.image = pygame.Surface((PLATFORM_SIZE, PLATFORM_SIZE))
         self.image.fill(pygame.Color('#905c2f'))
-        
-    
-class JumperBlock(DefaultBlock): # зачем
-    
-    def _postInit(self, *args, **kwargs):
-        super()._postInit()
-        self.image.fill(pygame.Color('#5faa0a'))
-        
-    def modifier(self, obj):
-        obj.velocity.y -= 10 
-    
-    
+
 
 class Player(abstract.TWObject): # игрок тоже наследуется от TWObject, что позволяет ему иметь свой uid и упрощать клиент-серверное общение
-        
+
     def _init_rect(self, *args, **kwargs):
-        self.image = pygame.image.load("img/gg.png")
+        self.image = pics['tee']
         
         
     def _postInit(self, client=False, *args, **kwargs):
@@ -43,18 +29,26 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
         self.rect.center = pmath.Vector2(self.rect.center)
         self.velocity = pmath.Vector2(0, 0) # скорость представляем в виде вектора для удобства
         self.keydir = pmath.Vector2(0, 0) # как и нажатые клавиши
+        self.lifes = 10 
         self.dir = (0, 0)
         self.onGround = False
         self.collideable = False # игроки не сталкиваются
         self.count = 0 # очки
-        self.lifes = 10 
-        self.armor = 0
         self.hook = GrapplingHook(owner=self)
         self.weapons = dict(map(lambda x: (x.__name__, x(owner=self, hidden=True)), # здесь валяется всё оружие игрока
                 [Hammer, Pistol, Shotgun, GrenadeLauncher, Ninja, Laser]))
         self.wpnswitcher = {getattr(pygame, 'K_%s' % (i+1)):v for i, v in enumerate(self.weapons)}
         self.switch_weapon('Hammer')
+        self.respawn()
         
+    
+    def respawn(self):
+        self.velocity = pmath.Vector2(0, 0)
+        self.lifes = 10
+        self.armor = 0
+        for wpn in self.weapons.values():
+            wpn.ammo = 15
+    
     
     def switch_weapon(self, key):
         try:
@@ -92,23 +86,29 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
         grapnel = self.hook.grapnel # физика хука
         if grapnel and grapnel.hooked:
             #print(grapnel.hook_max_dist - grapnel.dist)
-            if (grapnel.hook_max_dist - grapnel.dist) < 10:
+            delta = grapnel.hook_max_dist - grapnel.dist
+            if delta < 20:
                 vec_player_grapnel = pmath.Vector2(grapnel.rect.center) - self.rect.center
-                self.velocity += vec_player_grapnel.normalize()
+                try:
+                    vec_player_grapnel = vec_player_grapnel.normalize() * self.velocity.length()
+                    #print(f'{vec_player_grapnel}, {self.velocity.normalize()}')
+                    self.velocity = vec_player_grapnel
+                except ValueError: # если вектор вдруг нулевой
+                    pass
         
         self.onGround = False
-        self.rect.center += self.velocity
+            
 
-        for obj in OBJECTS_POOL: # проверки на столкновения с объектами на уровне
-            if self != obj and pygame.sprite.collide_rect(self, obj):
-                if obj.collideable:
-                    self.collide(obj)
-                    obj.modifier(self)
-                if obj.pickable:
-                    obj.picked_event(self)
+        for collided in pygame.sprite.spritecollide(self, OBJECTS_POOL, False): # проверки на столкновения с объектами на уровне
+            if collided.collideable:
+                self.collide(collided)
+            if collided.pickable:
+                collided.picked_event(self)
         
         if not self.onGround:
             self.velocity.y += GRAVITY # гравитацией снижаем высоту прыга
+            
+        self.rect.center += self.velocity
         
         if abs(self.velocity.x) <= FRICTION: # а трением не даём скользить из стены в стену
             self.velocity.x = 0
@@ -117,10 +117,10 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
                 self.velocity.x -= FRICTION
             elif self.velocity.x < 0:
                 self.velocity.x += FRICTION
-        
                 
+        
 
-    def collide(self, block):
+    def collide(self, block):            
         axis_rot = 45
         rot_coef = -2
         rot_offset_vert = axis_rot + rot_coef
@@ -128,20 +128,21 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
         f_up = 90
         f_left = 180
         f_down = 270
-        entrSide = utils.u_degrees(utils.angleTo(block.rect.center, self.rect.center)) # матааааааан, который понимает, столкнулись ли мы
+        entrSide = utils.u_degrees(utils.angleTo(block.rect.center, self.rect.center))
         if (f_up-rot_offset_vert) <= entrSide < (f_up+rot_offset_vert): #сверху
-            self.rect.bottom = block.rect.top+1
+            self.rect.bottom = block.rect.top + 1
             self.onGround = True
-            self.velocity.y = 0
+            if self.velocity.y > 0:
+                self.velocity.y = 0
         elif (f_left-rot_offset_hrz) <= entrSide < (f_left+rot_offset_hrz): #слева
-            self.rect.right = block.rect.left-1
+            self.rect.right = block.rect.left - 1
             self.velocity.x = 0
         elif (f_down-rot_offset_vert) <= entrSide < (f_down+rot_offset_vert): #снизу
             self.rect.top = block.rect.bottom
             if self.velocity.y < 0:
                 self.velocity.y = 0
         elif (360-rot_offset_hrz) <= entrSide or entrSide < rot_offset_hrz: #справа
-            self.rect.left = block.rect.right+1
+            self.rect.left = block.rect.right + 1
             self.velocity.x = 0
             
             
@@ -152,7 +153,8 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
         
         
     def hit(self, obj):
-        self.lifes -= obj.model.dmg
+        if not self.client:
+            self.lifes -= obj.model.dmg
         if self.lifes <= 0:
             pygame.event.post(pygame.event.Event(E_KILLED, author=obj.owner, target=self))
             
@@ -202,17 +204,20 @@ class Projectile(abstract.TWObject):
         self.rect.x += self.velocity.x
         self.rect.y += self.velocity.y
         
-        for obj in OBJECTS_POOL: # проверки на столкновения с объектами на уровне
-            if pygame.sprite.collide_rect(self, obj):
-                if obj.collideable or (obj._name == 'Player' and obj != self.owner):
-                    self.kaboom()
-    
-    
-    def kaboom(self):
-        for victim in OBJECTS_POOL:
-            if victim._name == 'Player' and utils.distTo(victim.rect.center, self.rect.center) <= self.model.splash_r:
-                victim.hit(self)
-        self._destroy()
+        target = pygame.sprite.spritecollideany(self, OBJECTS_POOL)
+        if not target:
+            return
+        is_player = (target._name == 'Player' and target != self.owner)
+        if target.collideable or is_player:
+            if self.model.splash_r > 0:
+                for victim in OBJECTS_POOL:
+                    if victim._name == 'Player' and utils.distTo(victim.rect.center, self.rect.center) <= self.model.splash_r:
+                        victim.hit(self)
+            else:
+                if is_player:
+                    target.hit(self)
+            self._destroy()
+
     
     
 class Grapnel(Projectile): # крюк как снаряд
@@ -228,22 +233,25 @@ class Grapnel(Projectile): # крюк как снаряд
         self.rect.center += self.velocity
         self.dist = utils.distTo(self.owner.rect.center, self.rect.center)
         
-        if self.dist > 300:
+        if self.dist > 300: # хук имеет максимальную дистанцию
             self._destroy()
         
         if not self.hooked:
-            for obj in OBJECTS_POOL:
-                if pygame.sprite.collide_rect(self, obj) and obj.collideable:
-                    self.velocity.x = 0
-                    self.velocity.y = 0
-                    self.hooked = True
-                    self.hook_max_dist = self.dist
-        
+            target = pygame.sprite.spritecollideany(self, OBJECTS_POOL) # ищем объект, за который можно зацепиться
+            if target and target.collideable:
+                self.velocity.x = 0
+                self.velocity.y = 0
+                self.hooked = True
+                self.hook_max_dist = self.dist
+        else:
+            if self.dist > self.hook_max_dist: # если растянулись сильнее дозволенного, то хук рвётся
+                self.hooked = False
+                self.owner.hook.release()
         self.angle = utils.angleTo(self.rect.center, self.owner.rect.center)
         degr = utils.u_degrees(self.angle)
         self.image = pygame.transform.rotate(self.orig_image, degr)
         #self.image = pygame.transform.flip(self.image, True, True)
-        self.rect = self.image.get_rect(center=self.rect.center)
+        #self.rect = self.image.get_rect(center=self.rect.center)
     
         
     def fx(self, surf): # рисуем звенья цепи
@@ -257,11 +265,7 @@ class Grapnel(Projectile): # крюк как снаряд
         self.chain = pygame.transform.flip(self.chain, False, True)
         for _ in range(links_cnt):
             link_pos += link_delta
-            surf.blit(self.chain, link_pos)                        
-
-
-    def __del__(self):
-        print('Grapnel is leaving you')
+            surf.blit(self.chain, link_pos)                     
 
 
 class GrapplingHook(abstract.Weapon): # крюк как оружие

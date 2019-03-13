@@ -2,7 +2,7 @@ from API import *
 from time import sleep
 from world import TWEngine
 from threading import Thread
-from configs import SCR_SIZE, SERV_IP, SERV_PORT, E_PICKED, MAX_LIFES
+from configs import SCR_SIZE, SERV_IP, SERV_PORT, E_PICKED, MAX_LIFES, E_KILLED
 from objects import real
 from datatypes import OBJECTS_POOL, pics
 import socket
@@ -28,7 +28,7 @@ class TWClient(TWRequest, TWEngine): # клиент тоже наследует 
                     self.window = pygame.display.set_mode(SCR_SIZE)
                     self.screen = pygame.Surface(SCR_SIZE)
                     TWEngine.__init__(self, data['nlvl']) # и игровой цикл
-                    self.player = TWEngine.spawn(real.Player, [0, 0], uid=data['uid'], client=True)
+                    self.player = self.spawn(real.Player, [10, 2], uid=data['uid'], client=True)
                     break
             except socket.error as err:
                 TWEngine.logger.error(str(err))
@@ -55,7 +55,7 @@ class TWClient(TWRequest, TWEngine): # клиент тоже наследует 
                     if upd_item['action'] == TW_ACTIONS.LOCATE:
                         if not obj: # если пытаемся обновить местоположение не существующего на клиенте объекта, то создаём его
                             try:
-                                TWEngine.spawn(eval(f"real.{attrib['name']}"), uid=uid, **attrib) # впервые в жизни пригодился eval
+                                self.spawn(eval(f"real.{attrib['name']}"), uid=uid, **attrib) # впервые в жизни пригодился eval
                             except KeyError as err:
                                 print(obj)
                                 TWEngine.logger.warning('Spawn error %s in %s' % (err, upd_item))
@@ -99,6 +99,10 @@ class TWClient(TWRequest, TWEngine): # клиент тоже наследует 
         
         if e.type == E_PICKED:
             self.api_update(e.target, TW_ACTIONS.REMOVE)
+            
+            
+        if e.type == E_KILLED:
+            e.target.respawn()
             
             
         if e.type == pygame.QUIT: # при закрытии клиента завершаем сразу же все потоки

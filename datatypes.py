@@ -29,16 +29,13 @@ class TWOrderedUpdates(OrderedUpdates): # массив спрайтов, в то
 
     def fx(self, surf):
         for s in self:
-            s.fx(surf)
+            try:
+                s.fx(surf)
+            except: pass
 
 
     def __getitem__(self, uid): #из массива можно выбирать объекты по uid'e, как из словаря
         return self.__uids.get(uid, None)
-
-    
-#     def custom_draw(self, surface): # каждому объекту позволено оставить свой след на холсте
-#         for sprite in self:
-#             sprite.drawings(surface)
         
 
 OBJECTS_POOL = TWOrderedUpdates()
@@ -66,6 +63,7 @@ def subsurf(dims=None, path='img/game.png', scale=0.39):
 
 # собираем все картиночки
 pics = {
+    'tee': subsurf(path='img/gg.png', scale=1.5),
 	'heart_full': subsurf((670, 0, 65, 65)),
 	'heart_empty': subsurf((735, 0, 65, 65)),
 	'heart_loot': subsurf((320, 70, 60, 50)),
@@ -150,7 +148,7 @@ wpns = {
 
     'GrenadeLauncher': {
         'dmg': 7,
-        'splash_r': 3,
+        'splash_r': 50,
         'flatness': 0.2,
         'speed': 23,
         'rate': 0.7

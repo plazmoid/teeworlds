@@ -17,42 +17,51 @@ class TWEngine(Thread): # здесь крутится игровой цикл н
         pygame.init()
         pygame.font.init()
         pygame.event.set_blocked(pygame.MOUSEMOTION) # чтоб движения мышки не забивали очередь событий
-        self.__lvl_builder = LevelBuilder()
+        self.__lvl_builder = LevelBuilder(self)
         self.__lvl_builder.build(nlvl)
         self.loop = True
         self.start()
+
 
     def run(self):
         while self.loop:
             self._e_cycle_body()
             pygame.time.wait(12)
+
     
     # все нужные действия в цикле будут выполняться отнаследованными клиентом и сервером по-разному
     def _e_cycle_body(self): 
         raise NotImplementedError
+
     
     # спавн игровых объектов с учётом того, что 1 единица на координатной сетке = 1 кубик (размеры прописаны в конфиге)
-    @staticmethod
-    def spawn(TWobj, coords, *args, **kwargs): 
+    def spawn(self, TWobj, coords, *args, **kwargs): 
         x, y, *sizes = coords
-        return TWobj([x*PLATFORM_SIZE, y*PLATFORM_SIZE] + sizes, *args, **kwargs)
+        if self.is_empty((x, y)) == True:
+            return TWobj([x*PLATFORM_SIZE, y*PLATFORM_SIZE] + sizes, *args, **kwargs)
+        else:
+            return False
     
     
     @property
     def lvl(self):
-        return self.__lvl_builder.CURR_LVL    
-    
+        return self.__lvl_builder.CURR_LVL
+
+
+    def is_empty(self, coords):
+        return self.__lvl_builder.level_map.get(coords, True)
+        
 
 class LevelBuilder: # парсер уровней
 
     CURR_LVL = 0
     
-    def __init__(self):
+    def __init__(self, eng=None):
+        self.eng = eng
         self.pattern = re.compile(r'-*?\d+?(?:\:-*?\d+\W|\W)')
         self.level_map = {} # {(x, y): block}
         self.blocks = {
-            '#': real.DefaultBlock,
-            '!': real.JumperBlock
+            '#': real.DefaultBlock
         }
         
 
@@ -85,8 +94,11 @@ class LevelBuilder: # парсер уровней
         by = 0
         for row in self.__unpack(nlvl):
             for bx, block in row.items():
-                TWEngine.spawn(self.blocks[block], (bx, by)) # создание кубиков уровня
+                sblock = self.eng.spawn(self.blocks[block], (bx, by)) # создание кубиков уровня
+                self.level_map[(bx, by)] = sblock._name
             by += 1
+            
+        #print(self.level_map)
             
             
             

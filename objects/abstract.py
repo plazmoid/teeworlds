@@ -70,10 +70,6 @@ class TWObject(Sprite): # любой объект в игре так или ин
         
     def _destroy(self): # при удалении подразумеваем, что ссылка на объект есть только в OBJECTS_POOL
         OBJECTS_POOL.remove_(self)
-        
-        
-    def modifier(self, obj): # для джамппада, скорей всего в мусор
-        pass
     
     
     def fx(self, surf):

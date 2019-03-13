@@ -58,7 +58,7 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
                 
     
     def player_reset(self):            
-        self.player = TWEngine.spawn(real.Player, [10, 2])
+        self.player = serv.spawn(real.Player, [10, 2])
         with lock:
             CLIENTS[self.player] = self # добавляем себя в глобальную таблицу клиентов
     
@@ -88,6 +88,8 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
                 self.player.keydir.y = -1
             elif pygame.K_0 <= key <= pygame.K_9:
                 self.player.switch_weapon(key)
+            elif key == pygame.K_u:
+                self.player.rect.center = (100, 20)
      
         elif ktype == pygame.KEYUP:
             if key == pygame.K_LEFT or key == pygame.K_a:
@@ -105,6 +107,7 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
         self.player._destroy()
         self.loop = False # завершаем для этого игрока игровой цикл
         TWEngine.logger.info(f'Player #{self.player.uid} disconnected')
+        
         
 
 class TWServer(ThreadingTCPServer, TWEngine): # игровой сервер помимо ожидания подключений крутит и игровой цикл
@@ -128,7 +131,7 @@ class TWServer(ThreadingTCPServer, TWEngine): # игровой сервер по
             #self.broadcast('api_update', e.target, TW_ACTIONS.REMOVE) # и говорим всем, что он отвалился
             e.author.count += 1
             e.target.rect.center = (100, 20)
-            e.target._postInit()
+            e.target.respawn()
         
     
     def get_updateable_objects(self): # получить все обновляемые объекты
@@ -151,8 +154,10 @@ class TWServer(ThreadingTCPServer, TWEngine): # игровой сервер по
         
     def __temp_spawner(self):
         while True:
-            obj = TWEngine.spawn(real.Heart, [randint(0, 25), randint(0, 15)])
-            self.broadcast('api_update', obj, TW_ACTIONS.LOCATE, 'get_state')
+            x = randint(0, 35)
+            y = randint(0, 15)
+            for i in range(randint(1, 5)):
+                self.spawn(real.Heart, [x + i, y])
             sleep(randint(8, 15))
     
 
