@@ -8,19 +8,17 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
-class GameEngine(Thread): # здесь крутится игровой цикл на сервере и клиенте
+class TWEngine(Thread): # здесь крутится игровой цикл на сервере и клиенте
     
-    curr_level = 0
     logger = logging.getLogger(__name__)
     
-    def __init__(self, nlvl=1):
+    def __init__(self, nlvl):
         super().__init__()
         pygame.init()
         pygame.font.init()
         pygame.event.set_blocked(pygame.MOUSEMOTION) # чтоб движения мышки не забивали очередь событий
-        GameEngine.curr_level = nlvl
-        level = LevelBuilder()
-        level.build(nlvl)
+        self.__lvl_builder = LevelBuilder()
+        self.__lvl_builder.build(nlvl)
         self.loop = True
         self.start()
 
@@ -38,23 +36,32 @@ class GameEngine(Thread): # здесь крутится игровой цикл 
     def spawn(TWobj, coords, *args, **kwargs): 
         x, y, *sizes = coords
         return TWobj([x*PLATFORM_SIZE, y*PLATFORM_SIZE] + sizes, *args, **kwargs)
-            
+    
+    
+    @property
+    def lvl(self):
+        return self.__lvl_builder.CURR_LVL    
+    
 
 class LevelBuilder: # парсер уровней
 
+    CURR_LVL = 0
+    
     def __init__(self):
         self.pattern = re.compile(r'-*?\d+?(?:\:-*?\d+\W|\W)')
+        self.level_map = {} # {(x, y): block}
         self.blocks = {
             '#': real.DefaultBlock,
             '!': real.JumperBlock
         }
-        self.level_map = {} # {(x, y): block}
+        
 
     def __normalize(self, s_coord):
         s_coord = int(s_coord)
         if s_coord < 0:
             s_coord += SCR_W_COEFF
         return s_coord
+
 
     def __unpack(self, level): # распаковка совершенно упоротого придуманного формата
         self.result = {}
@@ -71,13 +78,14 @@ class LevelBuilder: # парсер уровней
                     else:
                         self.result[self.__normalize(itm)] = rawblock
                 yield self.result
+                
 
-    def build(self, nlevel):
+    def build(self, nlvl):
+        LevelBuilder.CURR_LVL = nlvl
         by = 0
-        for row in self.__unpack(nlevel):
+        for row in self.__unpack(nlvl):
             for bx, block in row.items():
-                bpoint = [bx*PLATFORM_SIZE, by*PLATFORM_SIZE]
-                self.blocks[block](bpoint) # статические объекты уровня создаются туть
+                TWEngine.spawn(self.blocks[block], (bx, by)) # создание кубиков уровня
             by += 1
             
             

@@ -2,17 +2,15 @@ from threading import Thread, Lock
 from time import sleep
 from API import *
 from socketserver import BaseRequestHandler, ThreadingTCPServer
-from world import GameEngine
+from world import TWEngine
 from objects import real
-from configs import E_PICKED
+from configs import E_PICKED, E_KILLED
 from random import randint
+from datatypes import OBJECTS_POOL
 import pygame
-import datatypes
-
 
 
 CLIENTS = {} # {TWObject: TWServerHandler}
-OBJECTS_POOL = datatypes.get_objects_pool()
 lock = Lock()
 
 class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик одного соединения, крутится в отдельном потоке
@@ -31,15 +29,11 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
             if not data:
                 continue
             if data['method'] == 'INIT':
-                self.new_player()
+                self.net_spawn()
             elif data['method'] == 'CLOSE':
-                self.remove_player()
+                self.net_destroy()
             elif data['method'] == 'KEY':
                 self.keys_handler(data)
-            elif data['method'] == 'PING':
-                self.api_ping()
-            #elif data['method'] == 'INTERACT':
-            #    serv.remove_object(data['target']) # перепилить это под взаимодействия игроков
             elif data['method'] == 'UPDATE':
                 self.updater(data)
                 
@@ -48,20 +42,31 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
         for upd_item in data['updated']:
             if upd_item['action'] == TW_ACTIONS.LOCATE:
                 if upd_item['uid'] == self.player.uid:
-                    params = upd_item['params']
+                    params = upd_item['attrib']
                     self.player.dir = params['dir']
-                    #serv.broadcast('api_update', self.player, TW_ACTIONS.LOCATE, 'get_state') # когда клиент ну очень хочет сам обновиться
             elif upd_item['action'] == TW_ACTIONS.REMOVE:
                 serv.remove_object(upd_item['uid'])
-
-
-    def new_player(self):
-        self.player = GameEngine.spawn(real.Player, [10, 2])
-        self.api_init(GameEngine.curr_level) # только созданному игроку отправляется его uid (берётся в TWRequest) и номер загруженного на сервере уровня
+            elif upd_item['action'] == TW_ACTIONS.SHOOT:
+                pr_id = self.player.active.shoot(proj_uid=upd_item['attrib'])
+                serv.broadcast('api_update', self.player.uid, TW_ACTIONS.SHOOT, attrib=pr_id, exclude=self)
+            elif upd_item['action'] == TW_ACTIONS.HOOK:
+                if upd_item['attrib'] == 'release':
+                    pr_id = self.player.hook.release()
+                else:
+                    pr_id = self.player.hook.shoot(proj_uid=upd_item['attrib'])
+                serv.broadcast('api_update', self.player.uid, TW_ACTIONS.HOOK, attrib=pr_id, exclude=self)
+                
+    
+    def player_reset(self):            
+        self.player = TWEngine.spawn(real.Player, [10, 2])
         with lock:
             CLIENTS[self.player] = self # добавляем себя в глобальную таблицу клиентов
-        GameEngine.logger.info(f'Connected player #{self.player.uid}')
-        serv.broadcast('api_update', self.player, TW_ACTIONS.LOCATE, 'get_state') # широковещаем всем игрокам, что мы родились
+    
+
+    def net_spawn(self):
+        self.player_reset()
+        self.api_init(serv.lvl) # только созданному игроку отправляется его uid (берётся в TWRequest) и номер загруженного на сервере уровня
+        TWEngine.logger.info(f'Connected player #{self.player.uid} from {self.request.getpeername()}')
         Thread(target=self.__update_daemon).start()
         
         
@@ -83,7 +88,6 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
                 self.player.keydir.y = -1
             elif pygame.K_0 <= key <= pygame.K_9:
                 self.player.switch_weapon(key)
-                serv.broadcast('api_update', self.player, TW_ACTIONS.SWITCH, 'get_state')
      
         elif ktype == pygame.KEYUP:
             if key == pygame.K_LEFT or key == pygame.K_a:
@@ -93,25 +97,21 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
             elif key == pygame.K_UP or key == pygame.K_w:
                 self.player.keydir.y = 0
         
-        elif ktype == pygame.MOUSEBUTTONDOWN:
-            self.player.active.shoot()
-        
 
-    def remove_player(self):
+    def net_destroy(self):
         with lock: # потокобезопасно удаляем игрока из всех таблиц
             del CLIENTS[self.player]
-        OBJECTS_POOL.remove_(self.player) # а OBJECTS_POOL безопасен уже внутри реализации
-        self.loop = False # завершаем для этого игрока игровой цикл
         serv.broadcast('api_update', self.player, TW_ACTIONS.REMOVE) # и говорим всем, что он отвалился
-        GameEngine.logger.info(f'Player #{self.player.uid} disconnected')
+        self.player._destroy()
+        self.loop = False # завершаем для этого игрока игровой цикл
+        TWEngine.logger.info(f'Player #{self.player.uid} disconnected')
         
 
-
-class TWServer(ThreadingTCPServer, GameEngine): # игровой сервер помимо ожидания подключений крутит и игровой цикл
+class TWServer(ThreadingTCPServer, TWEngine): # игровой сервер помимо ожидания подключений крутит и игровой цикл
     
-    def __init__(self, *args, nlvl=1):
+    def __init__(self, *args, nlvl):
         ThreadingTCPServer.__init__(self, *args)
-        GameEngine.__init__(self, nlvl=nlvl)
+        TWEngine.__init__(self, nlvl=nlvl)
         Thread(target=self.__temp_spawner).start() # тестовый спавнер (зачем)
         
         
@@ -123,8 +123,12 @@ class TWServer(ThreadingTCPServer, GameEngine): # игровой сервер п
     def events_handler(self):
         e = pygame.event.poll()
         if e.type == E_PICKED: # кто-то что-то хапнул на карте
-            
             self.remove_object(e.target)
+        elif e.type == E_KILLED: # кто-то кого-то убил
+            #self.broadcast('api_update', e.target, TW_ACTIONS.REMOVE) # и говорим всем, что он отвалился
+            e.author.count += 1
+            e.target.rect.center = (100, 20)
+            e.target._postInit()
         
     
     def get_updateable_objects(self): # получить все обновляемые объекты
@@ -136,17 +140,23 @@ class TWServer(ThreadingTCPServer, GameEngine): # игровой сервер п
         serv.broadcast('api_update', obj, TW_ACTIONS.REMOVE)
 
         
-    def broadcast(self, method, *args, **kwargs):
+    def broadcast(self, method, *args, exclude=None, **kwargs):
         for client in CLIENTS.values():
-            getattr(client, method)(*args, **kwargs)
+            if client != exclude:
+                try:
+                    getattr(client, method)(*args, **kwargs)
+                except BrokenPipeError:
+                    client.net_destroy()
             
         
     def __temp_spawner(self):
         while True:
-            GameEngine.spawn(real.Heart, [randint(0, 25), randint(0, 20)])
+            obj = TWEngine.spawn(real.Heart, [randint(0, 25), randint(0, 15)])
+            self.broadcast('api_update', obj, TW_ACTIONS.LOCATE, 'get_state')
             sleep(randint(8, 15))
     
 
-ThreadingTCPServer.allow_reuse_address = True
-serv = TWServer(('', 31337), TWServerHandler, nlvl=1)
-Thread(target=serv.serve_forever).start()
+if __name__ == '__main__':
+    TWServer.allow_reuse_address = True
+    serv = TWServer(('', 31337), TWServerHandler, nlvl=1)
+    Thread(target=serv.serve_forever).start()

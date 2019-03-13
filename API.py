@@ -9,7 +9,8 @@ __all__ = ['TW_ACTIONS', 'TWRequest']
 class TW_ACTIONS: # действия для TW_UPDATE
     LOCATE = 0
     REMOVE = 1
-    SWITCH = 2
+    SHOOT = 2
+    HOOK = 3
 
 
 class TW_API:
@@ -30,10 +31,10 @@ class TW_API:
                 'updated': kwargs['updated']}
         
     @staticmethod
-    def UPD_DATA(**kwargs): # используется совместно с методом UPDATE, собирается в список и передаётся в кварг 'updated'
+    def UPD_ITEM(**kwargs): # используется совместно с методом UPDATE, собирается в список и передаётся в кварг 'updated'
         return {'uid': kwargs['uid'],
                 'action': kwargs['action'],
-                'params': kwargs['params']}
+                'attrib': kwargs['attrib']}
         
     @staticmethod
     def KEY(**kwargs):
@@ -52,18 +53,6 @@ class TW_API:
     def CLOSE(**kwargs):
         return {'uid': kwargs['uid'],
                 'method': 'CLOSE'}
-
-    @staticmethod
-    def PING(**kwargs):
-        return {'uid': kwargs['uid'],
-                'method': 'PING'}
-        
-    @staticmethod
-    def INTERACT(**kwargs): # взаимодействия игроков с окружающим миром
-        return {'uid': kwargs['uid'],
-                'method': 'INTERACT',
-                'target': kwargs['target']}
-
         
 
 class TWRequest: # шаблоны общения клиента и сервера
@@ -88,27 +77,20 @@ class TWRequest: # шаблоны общения клиента и сервер�
     def api_close(self):
         self._request(TW_API.CLOSE)
         
-        
-    def api_ping(self):
-        self._request(TW_API.PING)
 
-
-    def api_interact(self, target):
-        self._request(TW_API.INTERACT, target=target)
-        
-
-    def api_update(self, entity=None, action=None, params=None):
-        def getparams(obj):
-            return getattr(obj, params)() if params else None
+    def api_update(self, entity=None, action=None, attrib=None, upd_pid=True):
+        def getattrib(obj):
+            attr = getattr(obj, attrib) if attrib else None    
+            return attr() if callable(attr) else attr
         
         if entity: # обновлять можно
             if type(entity) == list: # списком
-                updated = [TW_API.UPD_DATA(uid=e.uid, action=action, params=getparams(e)) for e in entity]
+                updated = [TW_API.UPD_ITEM(uid=e.uid, action=action, attrib=getattrib(e)) for e in entity]
             elif type(entity) == int: # по uid'у
-                updated = [TW_API.UPD_DATA(uid=entity, action=action, params=None)]
+                updated = [TW_API.UPD_ITEM(uid=entity, action=action, attrib=attrib)]
             else: # по сущности TWObject
-                updated = [TW_API.UPD_DATA(uid=entity.uid, action=action, params=getparams(entity))]
-        self._request(TW_API.UPDATE, updated=updated)
+                updated = [TW_API.UPD_ITEM(uid=entity.uid, action=action, attrib=getattrib(entity))]
+        self._request(TW_API.UPDATE, updated=updated, upd_pid=upd_pid)
 
 
     def _request(self, method, **kwargs):
@@ -117,8 +99,8 @@ class TWRequest: # шаблоны общения клиента и сервер�
         except AttributeError:
             uid = -1
         data = method(uid=uid, **kwargs) # в каждый реквест зашивается uid отправителя (кроме запроса на инициализацию)
-        if self.client:
-            self.last_pid = randint(0, 65535)
+        if self.client and 'upd_pid' in kwargs and kwargs['upd_pid']:
+            self.last_pid = randint(0, 65535) # каждый реквест имеет свой pid, на который сервер должен ответить
         data['pid'] = self.last_pid
         self.logger.debug('SEND: {}'.format(data))
         data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
@@ -131,8 +113,7 @@ class TWRequest: # шаблоны общения клиента и сервер�
         try:
             data = pickle.loads(data)
             if self.client:
-                if self.last_pid == data['pid']:
-                    self.last_pid = data['pid']
+                if self.last_pid == data['pid']: # компенсация лагов, клиент реагирует только на самый последний ответ сервера
                     self.logger.debug('RECV: {}'.format(data))
                     return data
             else:
