@@ -78,7 +78,7 @@ pics = {
 	'Pistol_aim': subsurf((0, 130, 65, 65)),
 	'Pistol_proj': subsurf((207, 152, 38, 18)),
 
-	'Shotgun': subsurf((64, 193, 225, 6)),
+	'Shotgun': subsurf((64, 193, 225, 60)),
 	'Shotgun_aim': subsurf((0, 197, 60, 62)),
 	'Shotgun_proj': subsurf((340, 213, 25, 25)),
 
@@ -121,7 +121,7 @@ class WpnModel(namedtuple('WpnModel', [
 wpns = {
     'GrapplingHook': {
         'rate': 0.1,
-        'speed': 30,
+        'speed': 35,
         'flatness': 1,
     },
 
@@ -147,8 +147,8 @@ wpns = {
     },
 
     'GrenadeLauncher': {
-        'dmg': 7,
-        'splash_r': 50,
+        'dmg': 5,
+        'splash_r': 100,
         'flatness': 0.2,
         'speed': 23,
         'rate': 0.7

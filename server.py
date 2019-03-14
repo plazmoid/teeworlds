@@ -47,8 +47,9 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
             elif upd_item['action'] == TW_ACTIONS.REMOVE:
                 serv.remove_object(upd_item['uid'])
             elif upd_item['action'] == TW_ACTIONS.SHOOT:
-                pr_id = self.player.active.shoot(proj_uid=upd_item['attrib'])
-                serv.broadcast('api_update', self.player.uid, TW_ACTIONS.SHOOT, attrib=pr_id, exclude=self)
+                if self.player.active.ammo > 0:
+                    self.player.active.shoot(proj_uid=upd_item['attrib'])
+                    serv.broadcast('api_update', self.player.uid, TW_ACTIONS.SHOOT, attrib=upd_item['attrib'], exclude=self)
             elif upd_item['action'] == TW_ACTIONS.HOOK:
                 if upd_item['attrib'] == 'release':
                     pr_id = self.player.hook.release()
@@ -84,7 +85,7 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
                 self.player.keydir.x = -1
             elif key == pygame.K_RIGHT or key == pygame.K_d:
                 self.player.keydir.x = 1
-            elif key == pygame.K_UP or key == pygame.K_w:
+            elif key == pygame.K_UP or key == pygame.K_SPACE:
                 self.player.keydir.y = -1
             elif pygame.K_0 <= key <= pygame.K_9:
                 self.player.switch_weapon(key)
@@ -96,7 +97,7 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
                 self.player.keydir.x = 0
             elif key == pygame.K_RIGHT or key == pygame.K_d:
                 self.player.keydir.x = 0
-            elif key == pygame.K_UP or key == pygame.K_w:
+            elif key == pygame.K_UP or key == pygame.K_SPACE:
                 self.player.keydir.y = 0
         
 

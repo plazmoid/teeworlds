@@ -56,16 +56,16 @@ class TWClient(TWRequest, TWEngine): # клиент тоже наследует 
                     if upd_item['action'] == TW_ACTIONS.LOCATE:
                         if not obj: # если пытаемся обновить местоположение не существующего на клиенте объекта, то создаём его
                             try:
-                                #print('Awaiting for spawn:', attrib)
                                 self.spawn(eval(f"real.{attrib['name']}"), uid=uid, **attrib) # впервые в жизни пригодился eval
-                                #print('Spawned:', p)
                             except KeyError as err:
-                                TWEngine.logger.warning('Spawn error %s in %s' % (err, upd_item))
+                                pass
+                                #TWEngine.logger.warning('Spawn error %s in %s' % (err, upd_item))
                         else:
                             obj.rect.center = attrib['coords'] # иначе обновляем позицию
                             if attrib['name'] == 'Player':
                                 obj.count = attrib['count']
                                 obj.velocity = attrib['vel']
+                                obj.color = attrib['color']
                                 if uid != self.player.uid: # и направления оружия у всех, кроме самих себя
                                     obj.dir = attrib['dir']
                                     try:
@@ -91,9 +91,17 @@ class TWClient(TWRequest, TWEngine): # клиент тоже наследует 
     def events_handler(self):
         e = pygame.event.poll()
             
-        if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1: # выстрел
-            self.api_update(self.player.active, TW_ACTIONS.SHOOT, 'shoot')
+        if e.type == pygame.MOUSEBUTTONDOWN:
+            if e.button == 1: # выстрел
+                self.api_update(self.player.active, TW_ACTIONS.SHOOT, 'shoot')
+            elif e.button == 3: # выстрел хуком
+                self.api_update(self.player.hook, TW_ACTIONS.HOOK, 'shoot')
         
+        
+        if e.type == pygame.MOUSEBUTTONUP:
+            if e.button == 3:
+                self.api_update(self.player.hook, TW_ACTIONS.HOOK, 'release')
+            
         
         if e.type == pygame.KEYDOWN or e.type == pygame.KEYUP:
             self.api_key(e.type, e.key) # нажали или отжали клавишу - сообщаем серверу
@@ -116,15 +124,12 @@ class TWClient(TWRequest, TWEngine): # клиент тоже наследует 
                 self.player.keydir.x = -1
             elif e.key == pygame.K_RIGHT or e.key == pygame.K_d:
                 self.player.keydir.x = 1
-            elif e.key == pygame.K_UP or e.key == pygame.K_w:
+            elif e.key == pygame.K_UP or e.key == pygame.K_SPACE:
                 self.player.keydir.y = -1
             elif e.key == pygame.K_ESCAPE:
                 self.loop = False
             elif pygame.K_0 <= e.key <= pygame.K_9:
                 self.player.switch_weapon(e.key)
-            elif e.key == pygame.K_SPACE:
-                self.api_update(self.player.hook, TW_ACTIONS.HOOK, 'shoot')
-                #self.player.hook.shoot()
                 
                 
         if e.type == pygame.KEYUP:
@@ -132,11 +137,8 @@ class TWClient(TWRequest, TWEngine): # клиент тоже наследует 
                 self.player.keydir.x = 0
             elif e.key == pygame.K_RIGHT or e.key == pygame.K_d:
                 self.player.keydir.x = 0
-            elif e.key == pygame.K_UP or e.key == pygame.K_w:
+            elif e.key == pygame.K_UP or e.key == pygame.K_SPACE:
                 self.player.keydir.y = 0
-            elif e.key == pygame.K_SPACE:
-                self.api_update(self.player.hook, TW_ACTIONS.HOOK, 'release')
-                #self.player.hook.release()
 
     
     def HUD(self, surface):
@@ -144,10 +146,10 @@ class TWClient(TWRequest, TWEngine): # клиент тоже наследует 
         player_head_font = pygame.font.SysFont('Sans Serif', 25)
         players = list(filter(lambda x: x._name == 'Player', OBJECTS_POOL))
         for i, player in enumerate(players):
-            scoreboard = sb_font.render(f'#{player.uid}:  {player.count}', False, (0, 0, 0))
-            player_head = player_head_font.render(f'#{player.uid}', False, (0, 150, 150), (255, 255, 255))
-            surface.blit(scoreboard, (SCR_SIZE[0]-180, i*20+10))
-            surface.blit(player_head, (player.rect.x-20, player.rect.y-30))
+            scoreboard = sb_font.render(f'#{player.uid}:  {player.count}', False, player.color)
+            player_head = player_head_font.render(f'#{player.uid}', False, player.color, (250, 250, 250))
+            surface.blit(scoreboard, (SCR_SIZE[0]-160, i*20+20))
+            surface.blit(player_head, (player.rect.x-20, player.rect.y-25))
 
         '''for i in range(1, SCR_H_COEFF):
             fnt = sb_font.render(str(i), False, (0, 0, 0))

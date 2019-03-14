@@ -4,6 +4,7 @@ from objects import abstract
 from configs import JUMP_SPEED, GRAVITY, FRICTION, SPEED, PLATFORM_SIZE, MAX_LIFES, E_KILLED
 from pygame import math as pmath
 from datatypes import OBJECTS_POOL, pics
+from random import randint
 import pygame
 import utils
 
@@ -23,6 +24,7 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
         
         
     def _postInit(self, client=False, *args, **kwargs):
+        self.color = (randint(0, 220), randint(0, 220), randint(0, 220))
         self.updateable = True # любой игрок должен обновляться постоянно
         self.client = client # является ли игрок нами
         self.active = None # текущее оружие в руках
@@ -32,11 +34,12 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
         self.lifes = 10 
         self.dir = (0, 0)
         self.onGround = False
+        self.second_jump = True # доступен ли прыжок в воздухе
         self.collideable = False # игроки не сталкиваются
         self.count = 0 # очки
         self.hook = GrapplingHook(owner=self)
         self.weapons = dict(map(lambda x: (x.__name__, x(owner=self, hidden=True)), # здесь валяется всё оружие игрока
-                [Hammer, Pistol, Shotgun, GrenadeLauncher, Ninja, Laser]))
+                [Hammer, Pistol, Shotgun, GrenadeLauncher, Ninja]))
         self.wpnswitcher = {getattr(pygame, 'K_%s' % (i+1)):v for i, v in enumerate(self.weapons)}
         self.switch_weapon('Hammer')
         self.respawn()
@@ -72,6 +75,7 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
         state['lifes'] = self.lifes
         state['wpn'] = self.active._name
         state['count'] = self.count
+        state['color'] = self.color
         return state
         
 
@@ -80,14 +84,20 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
             self.dir = pygame.mouse.get_pos()
         if self.keydir.x != 0: 
             self.velocity.x = self.keydir.x*SPEED
-        if self.keydir.y == -1 and self.onGround:
-            self.velocity.y -= JUMP_SPEED
+        if self.keydir.y == -1:
+            if self.onGround:
+                self.velocity.y -= JUMP_SPEED
+                self.keydir.y = 0
+            else:
+                if self.second_jump:
+                    self.velocity.y = -JUMP_SPEED
+                    self.second_jump = False
             
         grapnel = self.hook.grapnel # физика хука
         if grapnel and grapnel.hooked:
             #print(grapnel.hook_max_dist - grapnel.dist)
             delta = grapnel.hook_max_dist - grapnel.dist
-            if delta < 20:
+            if delta < 20: # не даём оборваться хуку, запуская игрока в противоположном направлении
                 vec_player_grapnel = pmath.Vector2(grapnel.rect.center) - self.rect.center
                 try:
                     vec_player_grapnel = vec_player_grapnel.normalize() * self.velocity.length()
@@ -97,7 +107,7 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
                     pass
         
         self.onGround = False
-            
+        self.rect.center += self.velocity
 
         for collided in pygame.sprite.spritecollide(self, OBJECTS_POOL, False): # проверки на столкновения с объектами на уровне
             if collided.collideable:
@@ -107,8 +117,9 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
         
         if not self.onGround:
             self.velocity.y += GRAVITY # гравитацией снижаем высоту прыга
+        else:
+            self.second_jump = True
             
-        self.rect.center += self.velocity
         
         if abs(self.velocity.x) <= FRICTION: # а трением не даём скользить из стены в стену
             self.velocity.x = 0
@@ -185,14 +196,19 @@ class Projectile(abstract.TWObject):
     def _init_rect(self, *args, **kwargs):
         self.model = kwargs['model']
         self.image = self.model.proj
+        self.hit = False
         
         
     def _postInit(self, *args, **kwargs):
         self.owner = kwargs['owner']
+        if 'dir' in kwargs:
+            self.dir = kwargs['dir']
+        else:
+            self.dir = self.owner.dir
         self.collideable = False
         self.updateable = True
         self.velocity = pmath.Vector2(0, 0)
-        angle = utils.u_degrees(-utils.angleTo(self.rect.center, self.owner.dir))
+        angle = utils.u_degrees(-utils.angleTo(self.rect.center, self.dir))
         self.image = pygame.transform.rotate(self.image, angle)
         self.image = pygame.transform.flip(self.image, False, True)
         self.velocity.from_polar((self.model.speed, angle))
@@ -204,19 +220,19 @@ class Projectile(abstract.TWObject):
         self.rect.x += self.velocity.x
         self.rect.y += self.velocity.y
         
-        target = pygame.sprite.spritecollideany(self, OBJECTS_POOL)
-        if not target:
-            return
-        is_player = (target._name == 'Player' and target != self.owner)
-        if target.collideable or is_player:
-            if self.model.splash_r > 0:
-                for victim in OBJECTS_POOL:
-                    if victim._name == 'Player' and utils.distTo(victim.rect.center, self.rect.center) <= self.model.splash_r:
-                        victim.hit(self)
-            else:
-                if is_player:
-                    target.hit(self)
-            self._destroy()
+        if self.hit == True: return
+        for target in pygame.sprite.spritecollide(self, OBJECTS_POOL, False):
+            is_player = (target._name == 'Player' and target != self.owner)
+            if target.collideable or is_player:
+                self.hit = True
+                if self.model.splash_r > 10:
+                    for victim in OBJECTS_POOL:
+                        if victim._name == 'Player' and utils.distTo(victim.rect.center, self.rect.center) <= self.model.splash_r:
+                            victim.hit(self)
+                else:
+                    if is_player:
+                        target.hit(self)
+                self._destroy()
 
     
     
@@ -243,10 +259,10 @@ class Grapnel(Projectile): # крюк как снаряд
                 self.velocity.y = 0
                 self.hooked = True
                 self.hook_max_dist = self.dist
-        else:
-            if self.dist > self.hook_max_dist: # если растянулись сильнее дозволенного, то хук рвётся
-                self.hooked = False
-                self.owner.hook.release()
+        #else:
+        #    if self.dist > self.hook_max_dist: # если растянулись сильнее дозволенного, то хук рвётся
+        #        self.hooked = False
+        #        self.owner.hook.release()
         self.angle = utils.angleTo(self.rect.center, self.owner.rect.center)
         degr = utils.u_degrees(self.angle)
         self.image = pygame.transform.rotate(self.orig_image, degr)
@@ -299,7 +315,18 @@ class Hammer(abstract.Weapon):
 class Pistol(abstract.Weapon): pass
 
 
-class Shotgun(abstract.Weapon): pass
+class Shotgun(abstract.Weapon):
+    
+    def _shooter(self, proj_uid=None):
+        uids = []
+        if self.ammo > 0:
+            self.ammo -= 1
+            shots = proj_uid or (None, )*5
+            for s in shots:
+                pdir = (self.owner.dir[0] + randint(-30, 30), self.owner.dir[1] + randint(-30, 30))
+                proj = Projectile(self.owner.rect.center, model=self.model, owner=self.owner, uid=s, dir=pdir)
+                uids.append(proj.uid)
+            return uids
 
 
 class GrenadeLauncher(abstract.Weapon): pass

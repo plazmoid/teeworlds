@@ -152,6 +152,10 @@ class Weapon(Pickable):
     def _shooter(self, proj_uid=None):
         if self.ammo > 0:
             self.ammo -= 1
-            return real.Projectile(self.owner.rect.center, model=self.model, owner=self.owner, uid=proj_uid).uid
+            if proj_uid:
+                for pid in proj_uid:
+                    real.Projectile(self.owner.rect.center, model=self.model, owner=self.owner, uid=pid)
+            else:
+                return [real.Projectile(self.owner.rect.center, model=self.model, owner=self.owner).uid]
     
 
