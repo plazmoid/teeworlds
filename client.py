@@ -26,7 +26,7 @@ class TWClient(TWRequest, TWEngine): # клиент тоже наследует 
                 self.sock.connect(SERVER_ADDR)
                 self.api_init() # при успешном подключении запрашиваем свой uid и номер уровня
                 data = self._receive()
-                if data['method'] == 'INIT': # при успешной инициализации на сервере врубаем графоний
+                if data and data['method'] == 'INIT': # при успешной инициализации на сервере врубаем графоний
                     self.window = pygame.display.set_mode(SCR_SIZE)
                     self.screen = pygame.Surface(SCR_SIZE)
                     TWEngine.__init__(self, data['nlvl']) # и игровой цикл

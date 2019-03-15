@@ -67,8 +67,8 @@ class TWRequest: # шаблоны общения клиента и сервер�
         self.last_pid = None
 
 
-    def api_init(self, nlvl=None): # каждый json в TW_API имеет свой метод, которым он конструируется и отправляется
-        self._request(TW_API.INIT, nlvl=nlvl)
+    def api_init(self, nlvl=None, color=None): # каждый json в TW_API имеет свой метод, которым он конструируется и отправляется
+        self._request(TW_API.INIT, nlvl=nlvl, color=color)
 
 
     def api_key(self, keytype, key=None):

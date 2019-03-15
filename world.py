@@ -6,7 +6,7 @@ import re
 import logging
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 class TWEngine(Thread): # здесь крутится игровой цикл на сервере и клиенте
     
