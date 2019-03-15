@@ -24,7 +24,7 @@ class Player(abstract.TWObject): # игрок тоже наследуется о
         
         
     def _postInit(self, client=False, *args, **kwargs):
-        self.color = (randint(0, 220), randint(0, 220), randint(0, 220))
+        self.color = kwargs['color']
         self.updateable = True # любой игрок должен обновляться постоянно
         self.client = client # является ли игрок нами
         self.active = None # текущее оружие в руках

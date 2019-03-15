@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 from API import *
 from time import sleep
 from world import TWEngine
@@ -29,7 +30,7 @@ class TWClient(TWRequest, TWEngine): # клиент тоже наследует 
                     self.window = pygame.display.set_mode(SCR_SIZE)
                     self.screen = pygame.Surface(SCR_SIZE)
                     TWEngine.__init__(self, data['nlvl']) # и игровой цикл
-                    self.player = self.spawn(real.Player, [10, 2], uid=data['uid'], client=True)
+                    self.player = self.spawn(real.Player, [10, 2], uid=data['uid'], client=True, color=data['color'])
                     break
             except socket.error as err:
                 TWEngine.logger.error(str(err))

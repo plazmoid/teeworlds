@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 from threading import Thread, Lock
 from time import sleep
 from API import *
@@ -59,14 +60,14 @@ class TWServerHandler(BaseRequestHandler, TWRequest): # обработчик о�
                 
     
     def player_reset(self):            
-        self.player = serv.spawn(real.Player, [10, 2])
+        self.player = serv.spawn(real.Player, [10, 2], color=(randint(0, 220), randint(0, 220), randint(0, 220)))
         with lock:
             CLIENTS[self.player] = self # добавляем себя в глобальную таблицу клиентов
     
 
     def net_spawn(self):
         self.player_reset()
-        self.api_init(serv.lvl) # только созданному игроку отправляется его uid (берётся в TWRequest) и номер загруженного на сервере уровня
+        self.api_init(serv.lvl, self.player.color) # только созданному игроку отправляется его uid (берётся в TWRequest) и номер загруженного на сервере уровня
         TWEngine.logger.info(f'Connected player #{self.player.uid} from {self.request.getpeername()}')
         Thread(target=self.__update_daemon).start()
         

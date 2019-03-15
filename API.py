@@ -22,7 +22,8 @@ class TW_API:
     def INIT(**kwargs):
         return {'uid': kwargs['uid'],
                 'method': 'INIT',
-                'nlvl': kwargs['nlvl']}
+                'nlvl': kwargs['nlvl'],
+                'color': kwargs['color']}
 
     @staticmethod
     def UPDATE(**kwargs):
